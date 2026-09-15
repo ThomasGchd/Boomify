@@ -14,6 +14,16 @@ int dragTrack=-1,dragBar=-1;
 int scrollbarGrabOffset=0;
 POINT dragOrigin{};
 
+// V4 projects start empty. The V3 engine still owns the reset logic, so we clear
+// its old demo drum beat immediately after reset instead of carrying a template
+// into every new project.
+void freshEmpty(){
+    fresh();
+    clearDrum(0);
+    selectedTrack=0;selectedBar=0;cursorBar=0;scrollBar=0;
+    if(win){layout(win);InvalidateRect(win,nullptr,FALSE);}
+}
+
 bool hitClipAt(POINT p,int& tr,int& bar){
     for(int r=0;r<TRACKS;r++) for(int v=0;v<visibleBars;v++){
         int b=scrollBar+v;
@@ -92,6 +102,7 @@ LRESULT CALLBACK proc_v4(HWND h,UINT m,WPARAM wp,LPARAM lp){
     }
     if(m==WM_LBUTTONDOWN){
         POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
+        if(inside(newR,p)){freshEmpty();return 0;}
         if(inside(scrollThumbR,p) && activeBars>visibleBars){
             draggingScrollbar=true;
             scrollbarGrabOffset=p.x-scrollThumbR.left;
@@ -143,6 +154,6 @@ int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR,int){
     RegisterClassW(&wc);
     win=CreateWindowExW(0,wc.lpszClassName,L"Boomify Alpha 2 - Timeline V4",WS_OVERLAPPEDWINDOW,0,0,1500,920,nullptr,nullptr,hi,nullptr);
     if(!win)return 1;
-    fresh();layout(win);ShowWindow(win,SW_MAXIMIZE);UpdateWindow(win);
+    freshEmpty();layout(win);ShowWindow(win,SW_MAXIMIZE);UpdateWindow(win);
     MSG msg{};while(GetMessageW(&msg,nullptr,0,0)){TranslateMessage(&msg);DispatchMessageW(&msg);}return 0;
 }
