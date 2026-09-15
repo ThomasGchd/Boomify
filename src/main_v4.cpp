@@ -9,7 +9,9 @@
 namespace {
 enum { CTX_COPY=41001, CTX_PASTE, CTX_DUP, CTX_CLEAR, CTX_CURSOR, CTX_DELETE_BAR };
 bool draggingClip=false;
+bool draggingScrollbar=false;
 int dragTrack=-1,dragBar=-1;
+int scrollbarGrabOffset=0;
 POINT dragOrigin{};
 
 bool hitClipAt(POINT p,int& tr,int& bar){
@@ -37,6 +39,19 @@ void moveCell(int srcTrack,int srcBar,int dstTrack,int dstBar){
         clearNote(srcTrack==1?bass[srcBar]:melody[srcBar]);
     }
     selectedTrack=dstTrack;selectedBar=dstBar;ensureVisible(dstBar);layout(win);InvalidateRect(win,nullptr,FALSE);
+}
+
+void setScrollFromMouse(HWND h,int mouseX,bool preserveGrab){
+    if(activeBars<=visibleBars){scrollBar=0;layout(h);InvalidateRect(h,nullptr,FALSE);return;}
+    int trackLeft=scrollTrackR.left;
+    int trackWidth=scrollTrackR.right-scrollTrackR.left;
+    int thumbWidth=scrollThumbR.right-scrollThumbR.left;
+    int travel=std::max(1,trackWidth-thumbWidth);
+    int x=mouseX-(preserveGrab?scrollbarGrabOffset:thumbWidth/2);
+    x=std::clamp(x,trackLeft,trackLeft+travel);
+    int range=activeBars-visibleBars;
+    scrollBar=(int)(((long long)(x-trackLeft)*range+travel/2)/travel);
+    clampScroll();layout(h);InvalidateRect(h,nullptr,FALSE);
 }
 
 void showClipMenu(HWND h,POINT client,int tr,int bar){
@@ -76,11 +91,36 @@ LRESULT CALLBACK proc_v4(HWND h,UINT m,WPARAM wp,LPARAM lp){
         if(hitClipAt(p,tr,b)){showClipMenu(h,p,tr,b);return 0;}
     }
     if(m==WM_LBUTTONDOWN){
-        POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};int tr,b;
+        POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
+        if(inside(scrollThumbR,p) && activeBars>visibleBars){
+            draggingScrollbar=true;
+            scrollbarGrabOffset=p.x-scrollThumbR.left;
+            SetCapture(h);
+            return 0;
+        }
+        if(inside(scrollTrackR,p) && activeBars>visibleBars){
+            scrollbarGrabOffset=(scrollThumbR.right-scrollThumbR.left)/2;
+            setScrollFromMouse(h,p.x,false);
+            draggingScrollbar=true;
+            SetCapture(h);
+            return 0;
+        }
+        int tr,b;
         if(hitClipAt(p,tr,b)){
             draggingClip=true;dragTrack=tr;dragBar=b;dragOrigin=p;
             SetCapture(h);
         }
+    }
+    if(m==WM_MOUSEMOVE && draggingScrollbar && (wp&MK_LBUTTON)){
+        POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
+        setScrollFromMouse(h,p.x,true);
+        return 0;
+    }
+    if(m==WM_LBUTTONUP && draggingScrollbar){
+        POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
+        setScrollFromMouse(h,p.x,true);
+        ReleaseCapture();draggingScrollbar=false;
+        return 0;
     }
     if(m==WM_MOUSEMOVE && draggingClip && (wp&MK_LBUTTON)){
         POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};
