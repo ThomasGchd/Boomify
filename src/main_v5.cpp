@@ -1,9 +1,11 @@
 // Boomify V5 - project hub + multi-block timeline editing
-#define proc boomify_v4_proc
+#define BOOMIFY_V4_EXTERNAL_RENAMES
+#define proc boomify_v3_proc
 #define wWinMain boomify_v4_wWinMain
 #include "main_v4.cpp"
 #undef wWinMain
 #undef proc
+#undef BOOMIFY_V4_EXTERNAL_RENAMES
 
 namespace {
 struct BlockRef { int track=0, bar=0; };
@@ -40,7 +42,7 @@ void pasteMulti(){
 }
 void duplicateMulti(){
     if(multiSelection.empty()){duplicateClip();return;}
-    int minB=MAX_BARS,maxB=0;for(auto&q:multiSelection){minB=std::min(minB,q.bar);maxB=std::max(maxB,q.bar);}int width=maxB-minB+1;
+    int minB=MAX_BARS,maxB=0;for(auto&q:multiSelection){minB=std::min(minB,q.bar);maxB=std::max(maxB,q.bar);}
     copyMulti();selectedBar=maxB+1;if(selectedBar>=MAX_BARS)return;pasteMulti();ensureVisible(selectedBar);layout(win);
 }
 void clearMultiBlocks(){if(multiSelection.empty()){clearCell(selectedTrack,selectedBar);return;}for(auto&q:multiSelection)clearCell(q.track,q.bar);InvalidateRect(win,nullptr,FALSE);}
@@ -79,7 +81,7 @@ LRESULT CALLBACK proc_v5(HWND h,UINT m,WPARAM wp,LPARAM lp){
     if(m==WM_PAINT){
         PAINTSTRUCT ps;HDC s=BeginPaint(h,&ps);RECT c;GetClientRect(h,&c);HDC mem=CreateCompatibleDC(s);HBITMAP bm=CreateCompatibleBitmap(s,std::max(1L,c.right),std::max(1L,c.bottom));auto old=SelectObject(mem,bm);paint(mem,c);paintSelectionOverlay(mem);BitBlt(s,0,0,c.right,c.bottom,mem,0,0,SRCCOPY);SelectObject(mem,old);DeleteObject(bm);DeleteDC(mem);EndPaint(h,&ps);return 0;
     }
-    return boomify_v4_proc(h,m,wp,lp);
+    return proc_v4(h,m,wp,lp);
 }
 }
 
