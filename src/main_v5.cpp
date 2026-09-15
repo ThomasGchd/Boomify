@@ -1,9 +1,9 @@
 // Boomify V5 - project hub + multi-block timeline editing
-#define proc_v4 boomify_v4_proc
+#define proc boomify_v4_proc
 #define wWinMain boomify_v4_wWinMain
 #include "main_v4.cpp"
 #undef wWinMain
-#undef proc_v4
+#undef proc
 
 namespace {
 struct BlockRef { int track=0, bar=0; };
