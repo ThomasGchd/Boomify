@@ -1,0 +1,91 @@
+// Boomify V5 - project hub + multi-block timeline editing
+#define proc_v4 boomify_v4_proc
+#define wWinMain boomify_v4_wWinMain
+#include "main_v4.cpp"
+#undef wWinMain
+#undef proc_v4
+
+namespace {
+struct BlockRef { int track=0, bar=0; };
+struct BlockData { int track=0, offset=0; DrumClip drum{}; NoteClip note{}; };
+std::vector<BlockRef> multiSelection;
+std::vector<BlockData> multiClipboard;
+bool selectingRange=false;
+POINT rangeStart{}, rangeNow{};
+
+bool isSelectedMulti(int t,int b){for(auto&q:multiSelection)if(q.track==t&&q.bar==b)return true;return false;}
+void clearMulti(){multiSelection.clear();}
+void addMulti(int t,int b){if(!isSelectedMulti(t,b))multiSelection.push_back({t,b});}
+void selectRectCells(POINT a,POINT b){
+    clearMulti();
+    RECT rr{std::min(a.x,b.x),std::min(a.y,b.y),std::max(a.x,b.x),std::max(a.y,b.y)};
+    for(int t=0;t<TRACKS;t++)for(int v=0;v<visibleBars;v++){
+        int bar=scrollBar+v;if(bar>=activeBars)continue;RECT q=clipR[t][v];
+        RECT inter{};if(IntersectRect(&inter,&rr,&q))addMulti(t,bar);
+    }
+    if(!multiSelection.empty()){selectedTrack=multiSelection.front().track;selectedBar=multiSelection.front().bar;}
+    InvalidateRect(win,nullptr,FALSE);
+}
+void copyMulti(){
+    if(multiSelection.empty()){copyClip();return;}
+    multiClipboard.clear();int minBar=MAX_BARS;for(auto&q:multiSelection)minBar=std::min(minBar,q.bar);
+    for(auto&q:multiSelection){BlockData d;d.track=q.track;d.offset=q.bar-minBar;if(q.track==0)d.drum=drums[q.bar];else d.note=q.track==1?bass[q.bar]:melody[q.bar];multiClipboard.push_back(d);}copied=true;
+}
+void pasteMulti(){
+    if(multiClipboard.empty()){pasteClip();return;}
+    clearMulti();
+    for(auto&d:multiClipboard){int b=selectedBar+d.offset;if(b<0||b>=MAX_BARS)continue;if(b>=activeBars)activeBars=b+1;
+        if(d.track==0)drums[b]=d.drum;else if(d.track==1)bass[b]=d.note;else melody[b]=d.note;addMulti(d.track,b);}
+    ensureVisible(selectedBar);layout(win);InvalidateRect(win,nullptr,FALSE);
+}
+void duplicateMulti(){
+    if(multiSelection.empty()){duplicateClip();return;}
+    int minB=MAX_BARS,maxB=0;for(auto&q:multiSelection){minB=std::min(minB,q.bar);maxB=std::max(maxB,q.bar);}int width=maxB-minB+1;
+    copyMulti();selectedBar=maxB+1;if(selectedBar>=MAX_BARS)return;pasteMulti();ensureVisible(selectedBar);layout(win);
+}
+void clearMultiBlocks(){if(multiSelection.empty()){clearCell(selectedTrack,selectedBar);return;}for(auto&q:multiSelection)clearCell(q.track,q.bar);InvalidateRect(win,nullptr,FALSE);}
+
+void paintSelectionOverlay(HDC d){
+    for(auto&q:multiSelection){if(q.bar<scrollBar||q.bar>=scrollBar+visibleBars)continue;int v=q.bar-scrollBar;RECT r=clipR[q.track][v];line(d,r.left,r.top,r.right,r.top,RGB(245,245,245),2);line(d,r.left,r.bottom-1,r.right,r.bottom-1,RGB(245,245,245),2);line(d,r.left,r.top,r.left,r.bottom,RGB(245,245,245),2);line(d,r.right-1,r.top,r.right-1,r.bottom,RGB(245,245,245),2);}
+    if(selectingRange){RECT r{std::min(rangeStart.x,rangeNow.x),std::min(rangeStart.y,rangeNow.y),std::max(rangeStart.x,rangeNow.x),std::max(rangeStart.y,rangeNow.y)};line(d,r.left,r.top,r.right,r.top,RGB(210,210,210));line(d,r.left,r.bottom,r.right,r.bottom,RGB(210,210,210));line(d,r.left,r.top,r.left,r.bottom,RGB(210,210,210));line(d,r.right,r.top,r.right,r.bottom,RGB(210,210,210));}
+}
+
+void openExistingFromHub(HWND owner){openProject();}
+int startupHub(HWND owner){
+    int r=MessageBoxW(owner,L"Bienvenue dans Boomify\n\nOUI  - Nouveau projet\nNON - Ouvrir un projet existant\nANNULER - Quitter",L"Boomify - Projets",MB_YESNOCANCEL|MB_ICONINFORMATION|MB_TOPMOST);
+    if(r==IDYES){freshEmpty();return 1;}if(r==IDNO){freshEmpty();openExistingFromHub(owner);return 1;}return 0;
+}
+
+LRESULT CALLBACK proc_v5(HWND h,UINT m,WPARAM wp,LPARAM lp){
+    if(m==WM_KEYDOWN){
+        bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0;
+        if(ctrl&&wp=='C'){copyMulti();return 0;}if(ctrl&&wp=='V'){pasteMulti();return 0;}if(ctrl&&wp=='D'){duplicateMulti();return 0;}
+        if(wp==VK_DELETE && !(GetKeyState(VK_SHIFT)&0x8000)){clearMultiBlocks();return 0;}
+        if(wp==VK_ESCAPE){clearMulti();InvalidateRect(h,nullptr,FALSE);return 0;}
+    }
+    if(m==WM_LBUTTONDOWN){
+        POINT p{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};int tr,b;
+        if(hitClipAt(p,tr,b)){
+            bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0;
+            if(ctrl){if(isSelectedMulti(tr,b)){multiSelection.erase(std::remove_if(multiSelection.begin(),multiSelection.end(),[&](const BlockRef&q){return q.track==tr&&q.bar==b;}),multiSelection.end());}else addMulti(tr,b);selectedTrack=tr;selectedBar=b;InvalidateRect(h,nullptr,FALSE);return 0;}
+            clearMulti();addMulti(tr,b);selectedTrack=tr;selectedBar=b;InvalidateRect(h,nullptr,FALSE);
+        } else {
+            RECT c;GetClientRect(h,&c);int bottom=editorOpen?std::max(455,(int)(c.bottom*.64)):c.bottom-45;
+            if(p.x>=180&&p.x<c.right-20&&p.y>=126&&p.y<bottom){clearMulti();selectingRange=true;rangeStart=rangeNow=p;SetCapture(h);return 0;}
+        }
+    }
+    if(m==WM_MOUSEMOVE&&selectingRange&&(wp&MK_LBUTTON)){rangeNow={GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};selectRectCells(rangeStart,rangeNow);return 0;}
+    if(m==WM_LBUTTONUP&&selectingRange){rangeNow={GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};selectRectCells(rangeStart,rangeNow);selectingRange=false;ReleaseCapture();InvalidateRect(h,nullptr,FALSE);return 0;}
+    if(m==WM_PAINT){
+        PAINTSTRUCT ps;HDC s=BeginPaint(h,&ps);RECT c;GetClientRect(h,&c);HDC mem=CreateCompatibleDC(s);HBITMAP bm=CreateCompatibleBitmap(s,std::max(1L,c.right),std::max(1L,c.bottom));auto old=SelectObject(mem,bm);paint(mem,c);paintSelectionOverlay(mem);BitBlt(s,0,0,c.right,c.bottom,mem,0,0,SRCCOPY);SelectObject(mem,old);DeleteObject(bm);DeleteDC(mem);EndPaint(h,&ps);return 0;
+    }
+    return boomify_v4_proc(h,m,wp,lp);
+}
+}
+
+int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR,int){
+    WNDCLASSW wc{};wc.lpfnWndProc=proc_v5;wc.hInstance=hi;wc.lpszClassName=L"BoomifyV5";wc.hCursor=LoadCursor(nullptr,IDC_ARROW);RegisterClassW(&wc);
+    win=CreateWindowExW(0,wc.lpszClassName,L"Boomify Alpha 2 - Project Workspace",WS_OVERLAPPEDWINDOW,0,0,1500,920,nullptr,nullptr,hi,nullptr);if(!win)return 1;
+    freshEmpty();layout(win);if(!startupHub(win)){DestroyWindow(win);return 0;}ShowWindow(win,SW_MAXIMIZE);UpdateWindow(win);
+    MSG msg{};while(GetMessageW(&msg,nullptr,0,0)){TranslateMessage(&msg);DispatchMessageW(&msg);}return 0;
+}
