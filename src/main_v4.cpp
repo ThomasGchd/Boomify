@@ -1,10 +1,14 @@
 // Boomify V4: interaction layer built on the validated V3 engine.
 // Keeps the stable audio/timeline implementation while upgrading DAW-style block editing.
+#ifndef BOOMIFY_V4_EXTERNAL_RENAMES
 #define proc boomify_v3_proc
 #define wWinMain boomify_v3_wWinMain
+#endif
 #include "main_v3.cpp"
+#ifndef BOOMIFY_V4_EXTERNAL_RENAMES
 #undef wWinMain
 #undef proc
+#endif
 
 namespace {
 enum { CTX_COPY=41001, CTX_PASTE, CTX_DUP, CTX_CLEAR, CTX_CURSOR, CTX_DELETE_BAR };
