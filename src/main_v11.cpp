@@ -31,4 +31,6 @@ if(m==WM_RBUTTONDOWN){int lane,bar;if(hitTimeline11(p,lane,bar)){showV6ClipMenu(
 if(m==WM_MOUSEWHEEL&&laneSelected>=0&&laneSelected<(int)lanes.size()){POINT sp{GET_X_LPARAM(lp),GET_Y_LPARAM(lp)};ScreenToClient(h,&sp);for(size_t j=0;j<fxRects11.size();j++)if(inside(fxRects11[j],sp)){int idx=fxScroll11+(int)j;if(idx<(int)rack11[laneSelected].size()){rack11[laneSelected][idx].amount=std::clamp(rack11[laneSelected][idx].amount+(GET_WHEEL_DELTA_WPARAM(wp)>0?5:-5),0,100);InvalidateRect(h,nullptr,FALSE);return 0;}}}
 if(m==WM_KEYDOWN&&wp==VK_SPACE){play11();return 0;}return proc_v9(h,m,wp,lp);}
 }
+#ifndef BOOMIFY_V12_INCLUDE
 int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR,int){WNDCLASSW wc{};wc.lpfnWndProc=proc_v11;wc.hInstance=hi;wc.lpszClassName=L"BoomifyV11";wc.hCursor=LoadCursor(nullptr,IDC_ARROW);RegisterClassW(&wc);win=CreateWindowExW(0,wc.lpszClassName,L"Boomify Alpha 5",WS_OVERLAPPEDWINDOW,0,0,1600,960,nullptr,nullptr,hi,nullptr);if(!win)return 1;v6Fresh();editorOpen=true;sound9[1]=Sound9::SubBass;sound9[2]=Sound9::SawLead;layout11(win);ShowWindow(win,SW_MAXIMIZE);UpdateWindow(win);MSG msg{};while(GetMessageW(&msg,nullptr,0,0)){TranslateMessage(&msg);DispatchMessageW(&msg);}return 0;}
+#endif
