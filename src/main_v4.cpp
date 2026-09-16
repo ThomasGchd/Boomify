@@ -1,12 +1,18 @@
 // Boomify V4: interaction layer built on the validated V3 engine.
 #ifndef BOOMIFY_V4_EXTERNAL_RENAMES
 #define proc boomify_v3_proc
+#ifdef BOOMIFY_V7_INCLUDE
+#undef wWinMain
+#endif
 #define wWinMain boomify_v3_wWinMain
 #endif
 #include "main_v3.cpp"
 #ifndef BOOMIFY_V4_EXTERNAL_RENAMES
 #undef wWinMain
 #undef proc
+#ifdef BOOMIFY_V7_INCLUDE
+#define wWinMain wWinMain_v6_legacy
+#endif
 #endif
 
 namespace {
