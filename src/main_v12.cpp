@@ -11,7 +11,7 @@ RECT master12{},nav12{},navThumb12{},zoomMinus12{},zoomPlus12{},barsPlus12{};
 int dragMode12=0,dragFx12=-1;
 
 void duplicate12(){
-    if(multiSelection.empty()){duplicateV6();return;}
+    if(multiSelection.empty())return;
     auto src=multiSelection;int minB=MAX_BARS,maxB=-1;
     for(auto&q:src){minB=std::min(minB,q.bar);maxB=std::max(maxB,q.bar);}int span=maxB-minB+1;if(span<=0)return;
     struct Snap12{int lane=0,bar=0;LaneType type=LaneType::Instrument;DrumClip drum{};NoteClip note{};};
@@ -21,14 +21,7 @@ void duplicate12(){
     for(auto&s:snap){int dst=s.bar+span;if(dst<0||dst>=MAX_BARS)continue;if(dst>=activeBars)activeBars=dst+1;if(s.type==LaneType::Drums)drumForLane11(s.lane,dst)=s.drum;else if(s.type==LaneType::Instrument)noteForLane(s.lane,dst)=s.note;addMulti(s.lane,dst);first=std::min(first,dst);}
     if(first<MAX_BARS){selectedBar=first;ensureVisible(first);}layout11(win);InvalidateRect(win,nullptr,FALSE);
 }
-struct DupHook12{DupHook12(){contextDuplicateHook=duplicate12;}} dupHook12;
-
-void syncSelection12(int lane,int bar,bool add,bool extend){
-    lane=std::clamp(lane,0,(int)lanes.size()-1); bar=std::clamp(bar,0,activeBars-1);
-    if(extend && anchorLane12>=0){clearMulti();int l0=std::min(anchorLane12,lane),l1=std::max(anchorLane12,lane),b0=std::min(anchorBar12,bar),b1=std::max(anchorBar12,bar);for(int l=l0;l<=l1;l++)for(int b=b0;b<=b1;b++)addMulti(l,b);}
-    else{if(!add)clearMulti();bool found=false;for(auto&q:multiSelection)if(q.track==lane&&q.bar==bar){found=true;break;}if(add&&found)multiSelection.erase(std::remove_if(multiSelection.begin(),multiSelection.end(),[&](const BlockRef&q){return q.track==lane&&q.bar==bar;}),multiSelection.end());else addMulti(lane,bar);anchorLane12=lane;anchorBar12=bar;}
-    laneSelected=lane;selectedTrack=std::min(TRACKS-1,lane);selectedBar=bar;
-}
+void syncSelection12(int lane,int bar,bool add,bool extend){lane=std::clamp(lane,0,(int)lanes.size()-1);bar=std::clamp(bar,0,activeBars-1);if(extend&&anchorLane12>=0){clearMulti();int l0=std::min(anchorLane12,lane),l1=std::max(anchorLane12,lane),b0=std::min(anchorBar12,bar),b1=std::max(anchorBar12,bar);for(int l=l0;l<=l1;l++)for(int b=b0;b<=b1;b++)addMulti(l,b);}else{if(!add)clearMulti();bool found=false;for(auto&q:multiSelection)if(q.track==lane&&q.bar==bar){found=true;break;}if(add&&found)multiSelection.erase(std::remove_if(multiSelection.begin(),multiSelection.end(),[&](const BlockRef&q){return q.track==lane&&q.bar==bar;}),multiSelection.end());else addMulti(lane,bar);anchorLane12=lane;anchorBar12=bar;}laneSelected=lane;selectedTrack=std::min(TRACKS-1,lane);selectedBar=bar;}
 void selectRange12(POINT a,POINT b){clearMulti();RECT rr{std::min(a.x,b.x),std::min(a.y,b.y),std::max(a.x,b.x)+1,std::max(a.y,b.y)+1};for(int l=0;l<(int)lanes.size();l++)for(int v=0;v<visibleBars;v++){int bar=scrollBar+v;if(bar>=activeBars)continue;RECT q=cell11(l,v),inter{};if(IntersectRect(&inter,&rr,&q))addMulti(l,bar);}if(!multiSelection.empty()){laneSelected=multiSelection.front().track;selectedTrack=std::min(TRACKS-1,laneSelected);selectedBar=multiSelection.front().bar;anchorLane12=laneSelected;anchorBar12=selectedBar;}}
 void setPlayhead12(POINT p){if(p.x<(int)timeline10.left||p.x>=(int)timeline10.right)return;int w=std::max(1,(int)(timeline10.right-timeline10.left));int v=std::clamp((int)((long long)(p.x-(int)timeline10.left)*visibleBars/w),0,visibleBars-1);cursorBar=std::clamp(scrollBar+v,0,activeBars-1);InvalidateRect(win,nullptr,FALSE);}
 int currentPlayBar12(){if(!playing||!wave)return cursorBar;MMTIME mt{};mt.wType=TIME_SAMPLES;if(waveOutGetPosition(wave,&mt,sizeof(mt))!=MMSYSERR_NOERROR)return cursorBar;double sec=(double)mt.u.sample/SR,barSec=(60.0/std::max(1,bpm))*4.0;return std::clamp(playStartBar+(int)(sec/barSec),0,activeBars-1);}
