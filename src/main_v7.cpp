@@ -1,8 +1,14 @@
 // Boomify V7 - native instruments per track
 #define BOOMIFY_V7_INCLUDE
+#ifndef wWinMain
+#define BOOMIFY_V7_OWNS_WWINMAIN_MACRO
 #define wWinMain wWinMain_v6_legacy
+#endif
 #include "main_v6.cpp"
+#ifdef BOOMIFY_V7_OWNS_WWINMAIN_MACRO
 #undef wWinMain
+#undef BOOMIFY_V7_OWNS_WWINMAIN_MACRO
+#endif
 #undef BOOMIFY_V7_INCLUDE
 
 namespace {
