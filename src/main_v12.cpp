@@ -1,8 +1,8 @@
 // Boomify Alpha 5 - DAW interaction/navigation restoration layer
 // Keep V11 DSP/editor/FX, replace only the workspace interaction + playhead overlay.
-#define wWinMain wWinMain_v11_embedded
+#define BOOMIFY_V12_INCLUDE
 #include "main_v11.cpp"
-#undef wWinMain
+#undef BOOMIFY_V12_INCLUDE
 
 namespace {
 bool range12=false;
@@ -84,7 +84,7 @@ LRESULT CALLBACK proc_v12(HWND h,UINT m,WPARAM wp,LPARAM lp){
     if(m==WM_TIMER&&wp==1){ InvalidateRect(h,nullptr,FALSE); return proc_v11(h,m,wp,lp); }
     if(m==WM_LBUTTONDOWN && inside(timeline10,p)){
         int lane=-1,bar=-1; bool onCell=hitTimeline11(p,lane,bar);
-        setPlayhead12(p); // any click in arrangement chooses playback start
+        setPlayhead12(p);
         if(onCell){
             bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0,shift=(GetKeyState(VK_SHIFT)&0x8000)!=0;
             syncSelection12(lane,bar,ctrl,shift);
