@@ -1,7 +1,9 @@
 // Boomify V7 - native instruments per track
+#define BOOMIFY_V7_INCLUDE
 #define wWinMain wWinMain_v6_legacy
 #include "main_v6.cpp"
 #undef wWinMain
+#undef BOOMIFY_V7_INCLUDE
 
 namespace {
 enum class NativeSound{Bass,Saw,Lead,Pluck,Pad};
