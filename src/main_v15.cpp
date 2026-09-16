@@ -1,9 +1,9 @@
 // Boomify V15 - Alpha 6 DAW expansion
+#define BOOMIFY_V15_INCLUDE
 #define proc_v14 proc_v14_base15
-#define wWinMain wWinMain_v14_embedded15
 #include "main_v14.cpp"
-#undef wWinMain
 #undef proc_v14
+#undef BOOMIFY_V15_INCLUDE
 
 #include <commctrl.h>
 #include <cmath>
