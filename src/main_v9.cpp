@@ -1,7 +1,7 @@
 // Boomify Alpha 5 - instrument families + native FX
-#define wWinMain wWinMain_v8_legacy
+#define BOOMIFY_V9_INCLUDE
 #include "main_v8.cpp"
-#undef wWinMain
+#undef BOOMIFY_V9_INCLUDE
 
 namespace {
 enum class Family9{Bass,Synth,Keys,Pluck,Pad};
