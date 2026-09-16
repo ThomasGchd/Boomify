@@ -101,7 +101,7 @@ LRESULT CALLBACK proc_v12(HWND h,UINT m,WPARAM wp,LPARAM lp){
     if(m==WM_KEYDOWN){
         bool ctrl=(GetKeyState(VK_CONTROL)&0x8000)!=0;
         if(ctrl&&wp=='D'){ duplicateV6(); return 0; }
-        if(wp==VK_DELETE){ clearSelectedMulti(); return 0; }
+        if(wp==VK_DELETE){ clearMultiBlocks(); return 0; }
         if(wp==VK_ESCAPE){ clearMulti(); range12=false; if(GetCapture()==h)ReleaseCapture(); InvalidateRect(h,nullptr,FALSE); return 0; }
     }
     return proc_v11(h,m,wp,lp);
