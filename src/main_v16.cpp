@@ -1,31 +1,35 @@
-// Boomify V16 - Alpha 6 stabilization: real track colors + clean BoomBox render
-#define BOOMIFY_V15_INCLUDE
-#define render15 render15_base16
-#define play15 play15_base16
-#define export15 export15_base16
-#define draw15 draw15_base16
-#define proc_v15 proc_v15_base16
-#define wWinMain wWinMain_v15_embedded16
+// Boomify V16 - Alpha 6 modular workspace shell
+#define wWinMain wWinMain_v15_engine16
 #include "main_v15.cpp"
 #undef wWinMain
-#undef proc_v15
-#undef draw15
-#undef export15
-#undef play15
-#undef render15
-#undef BOOMIFY_V15_INCLUDE
 
 namespace {
-void render16(std::vector<int16_t>&a,int start){
-    std::array<bool,V6_MAX_TRACKS> oldMute{};
-    for(int i=0;i<(int)lanes.size();++i){oldMute[i]=lanes[i].mute;if(kicks15[i].enabled)lanes[i].mute=true;}
-    renderRange11(a,start);
-    for(int i=0;i<(int)lanes.size();++i)lanes[i].mute=oldMute[i];
-    mixSample15(a,start);mixBoom15(a,start);masterBus15(a);
+struct Workspace16{RECT header{},tracks{},timeline{},fx{},editor{};int tracksW=230;};
+Workspace16 ws16{};
+
+void layout16(HWND h){
+    RECT c{};GetClientRect(h,&c);
+    const int headerH=72;
+    const int fxW=std::clamp((int)(c.right*0.21),300,380);
+    const int editorH=std::clamp((int)(c.bottom*0.31),220,320);
+    const int workBottom=std::max(headerH+180,(int)c.bottom-editorH);
+    ws16.header={0,0,c.right,(LONG)headerH};
+    ws16.tracks={0,(LONG)headerH,(LONG)ws16.tracksW,(LONG)workBottom};
+    ws16.fx={(LONG)(c.right-fxW),(LONG)headerH,c.right,c.bottom};
+    ws16.timeline={(LONG)ws16.tracksW,(LONG)headerH,ws16.fx.left,(LONG)workBottom};
+    ws16.editor={(LONG)ws16.tracksW,(LONG)workBottom,ws16.fx.left,c.bottom};
+    panels15.tracks=ws16.tracks;panels15.timeline=ws16.timeline;panels15.inspector=ws16.fx;
+    int rowsH=std::max(1,(int)(ws16.timeline.bottom-ws16.timeline.top)-PANEL_HEADER15);
+    panels15.rowH=std::clamp(rowsH/std::max(1,(int)lanes.size()),34,58);
 }
-void play16(){if(playing){stopAudio();return;}playStartBar=cursorBar;render16(playBuffer,playStartBar);WAVEFORMATEX f{};f.wFormatTag=WAVE_FORMAT_PCM;f.nChannels=2;f.nSamplesPerSec=SR;f.wBitsPerSample=16;f.nBlockAlign=4;f.nAvgBytesPerSec=SR*4;if(waveOutOpen(&wave,WAVE_MAPPER,&f,(DWORD_PTR)win,0,CALLBACK_WINDOW)!=MMSYSERR_NOERROR){wave=nullptr;return;}waveHdr={};waveHdr.lpData=(LPSTR)playBuffer.data();waveHdr.dwBufferLength=(DWORD)std::min<size_t>(playBuffer.size()*sizeof(int16_t),0xFFFFFFFFu);if(waveOutPrepareHeader(wave,&waveHdr,sizeof(waveHdr))!=MMSYSERR_NOERROR||waveOutWrite(wave,&waveHdr,sizeof(waveHdr))!=MMSYSERR_NOERROR){stopAudio();return;}playing=true;SetTimer(win,1,33,nullptr);InvalidateRect(win,nullptr,FALSE);}
-void export16(){auto p=dialog(true,L"WAV Audio\0*.wav\0",L"wav");if(p.empty())return;std::vector<int16_t>a;render16(a,0);std::ofstream o(p,std::ios::binary);uint32_t ds=(uint32_t)(a.size()*sizeof(int16_t)),rs=36+ds,fs=16,rate=SR,br=SR*4;uint16_t pcm=1,ch=2,al=4,bits=16;o.write("RIFF",4);o.write((char*)&rs,4);o.write("WAVEfmt ",8);o.write((char*)&fs,4);o.write((char*)&pcm,2);o.write((char*)&ch,2);o.write((char*)&rate,4);o.write((char*)&br,4);o.write((char*)&al,2);o.write((char*)&bits,2);o.write("data",4);o.write((char*)&ds,4);o.write((char*)a.data(),ds);}
-void drawTrackColors16(HDC d){for(int l=0;l<(int)lanes.size();++l){COLORREF c=colors15[l]?colors15[l]:defaultColor15(l);for(int v=0;v<visibleBars;++v){int b=scrollBar+v;if(b>=activeBars)break;if(!laneUsed11(l,b))continue;RECT r=v6CellRect(l,v);fill(d,{r.left+2,r.top+2,r.right-2,r.bottom-2},c);}}}
-LRESULT CALLBACK proc_v16(HWND h,UINT m,WPARAM w,LPARAM l){POINT p{GET_X_LPARAM(l),GET_Y_LPARAM(l)};if(m==WM_PAINT){PAINTSTRUCT ps;HDC s=BeginPaint(h,&ps);RECT c;GetClientRect(h,&c);HDC mem=CreateCompatibleDC(s);HBITMAP bm=CreateCompatibleBitmap(s,std::max(1,(int)c.right),std::max(1,(int)c.bottom));auto old=SelectObject(mem,bm);draw11(mem,c);drawTrackColors16(mem);overlay12(mem);drawV13Chrome(mem);drawV14(mem);draw15_base16(mem);BitBlt(s,0,0,c.right,c.bottom,mem,0,0,SRCCOPY);SelectObject(mem,old);DeleteObject(bm);DeleteDC(mem);EndPaint(h,&ps);return 0;}if(m==WM_LBUTTONDOWN){if(inside(playR,p)){play16();return 0;}if(inside(wavR,p)){export16();return 0;}}return proc_v15_base16(h,m,w,l);}
+void panelFrame16(HDC d,const RECT&r,COLORREF bg){fill(d,r,bg);line(d,r.left,r.top,r.right,r.top,RGB(55,59,68));line(d,r.left,r.bottom-1,r.right,r.bottom-1,RGB(42,46,54));}
+void header16(HDC d){panelFrame16(d,ws16.header,RGB(20,22,27));label(d,L"BOOMIFY",18,17,13,RGB(242,243,246),FW_BOLD);label(d,L"ALPHA 6",18,43,6,RGB(130,136,148),FW_BOLD);}
+void editor16(HDC d){panelFrame16(d,ws16.editor,RGB(18,20,24));RECT bar{ws16.editor.left,ws16.editor.top,ws16.editor.right,ws16.editor.top+34};fill(d,bar,RGB(27,30,36));std::wstring t=L"EDITEUR";if(laneSelected>=0&&laneSelected<(int)lanes.size())t+=lanes[laneSelected].type==LaneType::Drums?L"  /  BATTERIE":lanes[laneSelected].type==LaneType::Audio?L"  /  AUDIO":L"  /  PIANO ROLL";label(d,t.c_str(),bar.left+12,bar.top+11,7,RGB(183,188,198),FW_BOLD);}
+void workspace16(HDC d,RECT c){fill(d,c,RGB(16,18,22));header16(d);drawTracks15(d);drawTimeline15(d);editor16(d);draw15(d);line(d,ws16.tracks.right-1,ws16.tracks.top,ws16.tracks.right-1,ws16.tracks.bottom,RGB(73,77,88),2);line(d,ws16.fx.left,ws16.fx.top,ws16.fx.left,ws16.fx.bottom,RGB(73,77,88),2);line(d,ws16.editor.left,ws16.editor.top,ws16.editor.right,ws16.editor.top,RGB(73,77,88),2);}
+LRESULT CALLBACK proc_v16(HWND h,UINT m,WPARAM w,LPARAM l){
+    if(m==WM_SIZE){proc_v14_base15(h,m,w,l);layout16(h);InvalidateRect(h,nullptr,FALSE);return 0;}
+    if(m==WM_PAINT){layout16(h);PAINTSTRUCT ps{};HDC s=BeginPaint(h,&ps);RECT c{};GetClientRect(h,&c);HDC mem=CreateCompatibleDC(s);HBITMAP bm=CreateCompatibleBitmap(s,std::max(1,(int)c.right),std::max(1,(int)c.bottom));HGDIOBJ old=SelectObject(mem,bm);draw11(mem,c);drawV13Chrome(mem);drawV14(mem);workspace16(mem,c);BitBlt(s,0,0,c.right,c.bottom,mem,0,0,SRCCOPY);SelectObject(mem,old);DeleteObject(bm);DeleteDC(mem);EndPaint(h,&ps);return 0;}
+    layout16(h);return proc_v15(h,m,w,l);
 }
-int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,LPWSTR,int){for(int i=0;i<V6_MAX_TRACKS;i++)colors15[i]=defaultColor15(i);editorOpen=true;sound9[1]=Sound9::SubBass;sound9[2]=Sound9::SawLead;master=100;WNDCLASSW wc{};wc.lpfnWndProc=proc_v16;wc.hInstance=hi;wc.lpszClassName=L"BoomifyAlpha6V16";wc.hCursor=LoadCursor(nullptr,IDC_ARROW);wc.hbrBackground=(HBRUSH)GetStockObject(BLACK_BRUSH);wc.style=CS_DBLCLKS;RegisterClassW(&wc);win=CreateWindowExW(0,wc.lpszClassName,L"Boomify Studio - Alpha 6",WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,1440,900,nullptr,nullptr,hi,nullptr);if(!win)return 1;ShowWindow(win,SW_MAXIMIZE);UpdateWindow(win);layout11(win);MSG msg{};while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}return(int)msg.wParam;}
+}
+int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,LPWSTR,int){for(int i=0;i<V6_MAX_TRACKS;i++)colors15[i]=defaultColor15(i);v6Fresh();editorOpen=true;sound9[1]=Sound9::SubBass;sound9[2]=Sound9::SawLead;master=100;WNDCLASSW wc{};wc.lpfnWndProc=proc_v16;wc.hInstance=hi;wc.lpszClassName=L"BoomifyAlpha6Workspace";wc.hCursor=LoadCursor(nullptr,IDC_ARROW);wc.hbrBackground=(HBRUSH)GetStockObject(BLACK_BRUSH);wc.style=CS_DBLCLKS;RegisterClassW(&wc);win=CreateWindowExW(0,wc.lpszClassName,L"Boomify Studio - Alpha 6 Workspace",WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,1440,900,nullptr,nullptr,hi,nullptr);if(!win)return 1;layout11(win);layout16(win);ShowWindow(win,SW_MAXIMIZE);UpdateWindow(win);MSG msg{};while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}return(int)msg.wParam;}
