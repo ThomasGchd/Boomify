@@ -1,7 +1,7 @@
 // Boomify V17 - Alpha 6 persistence layer
-#define wWinMain wWinMain_v16_engine17
+#define BOOMIFY_V16_NO_ENTRY
 #include "main_v16.cpp"
-#undef wWinMain
+#undef BOOMIFY_V16_NO_ENTRY
 
 namespace {
 void writeString17(std::ofstream& o,const std::wstring& s){std::string n=narrowName(s);o<<n.size()<<' ';o.write(n.data(),(std::streamsize)n.size());o<<'\n';}
