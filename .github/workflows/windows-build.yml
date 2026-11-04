@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-build-${{ github.ref }}
@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure MSVC x64
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBOOMIFY_BUILD_SHA="${{ github.sha }}"
 
       - name: Build Release
         run: cmake --build build --config Release --parallel 2
@@ -43,3 +43,27 @@ jobs:
           path: build/Release/Boomify.exe
           if-no-files-found: error
           retention-days: 14
+
+      - name: Generate update manifest
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $sha = "${{ github.sha }}"
+          $digest = (Get-FileHash "build/Release/Boomify.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          @($sha, $digest) | Set-Content -Path "build/Release/version.txt" -Encoding ascii
+
+      - name: Publish rolling alpha update
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view alpha-rolling --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create alpha-rolling --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Boomify Alpha - mises a jour" --notes "Canal de mises a jour automatiques de Boomify. Developpement alpha : sauvegardez vos projets avant chaque mise a jour." --prerelease
+            if ($LASTEXITCODE -ne 0) { throw "Failed to create rolling alpha release" }
+          }
+          gh release upload alpha-rolling "build/Release/Boomify.exe#Boomify.exe" --clobber --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload Boomify executable" }
+          gh release upload alpha-rolling "build/Release/version.txt#version.txt" --clobber --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload version manifest" }
