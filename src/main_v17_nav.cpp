@@ -59,9 +59,37 @@ void renderBasicKickNav(std::vector<int16_t>&a,int startBar){if(a.empty())return
 void renderNav(std::vector<int16_t>&a,int start){struct Hit{int lane,bar,step;};std::vector<Hit> hidden;for(int l=0;l<(int)lanes.size();++l){if(lanes[l].type!=LaneType::Drums||kicks15[l].enabled||lanes[l].mute)continue;for(int b=std::max(0,start);b<activeBars;++b){auto&d=drumForLane11(l,b);for(int s=0;s<STEPS;++s)if(d[0][s]){hidden.push_back({l,b,s});d[0][s]=false;}}}
 // Keep synths heavily reduced, but let native bass sit much closer to the drums.
 // This is render-only: project faders and saved values remain untouched.
-std::vector<int> oldVol(lanes.size());for(int l=0;l<(int)lanes.size();++l){oldVol[l]=lanes[l].volume;if(lanes[l].type==LaneType::Instrument){bool bass=familyOf(sound9[l])==Family9::Bass;lanes[l].volume=bass?std::max(0,(lanes[l].volume+9)/10):std::max(0,(lanes[l].volume+49)/50);}}
+// Render external instruments first; only silence a native lane when the plugin
+// successfully produced a buffer. A missing/crashed VST3 falls back to native audio.
+const double renderBarSeconds=240.0/std::max(60,bpm);
+size_t extFrames=(size_t)(std::ceil((activeBars-std::max(0,start))*renderBarSeconds*SR)+SR);
+std::vector<int16_t> externalMix(extFrames*2,0);
+std::vector<bool> externalOK(lanes.size(),false), oldMute(lanes.size(),false);
+for(int l=0;l<(int)lanes.size();++l){
+ if(lanes[l].type==LaneType::Instrument&&!vst3ForLaneNav[l].empty())
+  externalOK[l]=renderVST3LaneNav(l,start,externalMix);
+ oldMute[l]=lanes[l].mute;
+ if(externalOK[l])lanes[l].mute=true;
+}
+std::vector<int> oldVol(lanes.size());
+for(int l=0;l<(int)lanes.size();++l){
+ oldVol[l]=lanes[l].volume;
+ if(lanes[l].type==LaneType::Instrument){
+  bool bass=familyOf(sound9[l])==Family9::Bass;
+  lanes[l].volume=bass?std::max(0,(lanes[l].volume+9)/10):
+                       std::max(0,(lanes[l].volume+49)/50);
+ }
+}
 render16(a,start);
-for(int l=0;l<(int)lanes.size();++l)lanes[l].volume=oldVol[l];for(auto&h:hidden)drumForLane11(h.lane,h.bar)[0][h.step]=true;renderBasicKickNav(a,start);renderFineDrumsNav(a,start);loudness16(a);}
+for(int l=0;l<(int)lanes.size();++l){
+ lanes[l].volume=oldVol[l];lanes[l].mute=oldMute[l];
+}
+if(a.size()<externalMix.size())a.resize(externalMix.size(),0);
+for(size_t i=0;i<externalMix.size();++i){
+ a[i]=(int16_t)std::clamp((int)a[i]+(int)externalMix[i],-32768,32767);
+}
+for(auto&h:hidden)drumForLane11(h.lane,h.bar)[0][h.step]=true;
+renderBasicKickNav(a,start);renderFineDrumsNav(a,start);loudness16(a);}
 void playNav(){if(playing&&wave){MMRESULT result=pausedNav?waveOutRestart(wave):waveOutPause(wave);if(result==MMSYSERR_NOERROR)pausedNav=!pausedNav;else MessageBoxW(win,L"Impossible de modifier la lecture audio.",L"Boomify",MB_ICONERROR);InvalidateRect(win,nullptr,FALSE);return;}pausedNav=false;int start=loopOnNav?loopStartNav:cursorBar;start=std::clamp(start,0,std::max(0,activeBars-1));playStartBar=start;renderNav(playBuffer,start);if(loopOnNav){int bpmNow=std::max(60,(int)bpm);double secBar=240.0/(double)bpmNow;size_t frames=(size_t)(secBar*SR)*std::max(1,loopEndNav-loopStartNav+1),samples=frames*2;if(playBuffer.size()>samples)playBuffer.resize(samples);}WAVEFORMATEX f{};f.wFormatTag=WAVE_FORMAT_PCM;f.nChannels=2;f.nSamplesPerSec=SR;f.wBitsPerSample=16;f.nBlockAlign=4;f.nAvgBytesPerSec=SR*4;if(waveOutOpen(&wave,WAVE_MAPPER,&f,(DWORD_PTR)win,0,CALLBACK_WINDOW)!=MMSYSERR_NOERROR){wave=nullptr;MessageBoxW(win,L"Impossible d'ouvrir la sortie audio Windows.",L"Boomify",MB_OK|MB_ICONERROR);return;}waveHdr={};waveHdr.lpData=(LPSTR)playBuffer.data();waveHdr.dwBufferLength=(DWORD)std::min<size_t>(playBuffer.size()*sizeof(int16_t),0xFFFFFFFFu);if(loopOnNav){waveHdr.dwFlags=WHDR_BEGINLOOP|WHDR_ENDLOOP;waveHdr.dwLoops=0xFFFFFFFFu;}if(waveOutPrepareHeader(wave,&waveHdr,sizeof(waveHdr))!=MMSYSERR_NOERROR||waveOutWrite(wave,&waveHdr,sizeof(waveHdr))!=MMSYSERR_NOERROR){stopAudio();MessageBoxW(win,L"Le flux audio n'a pas pu demarrer.",L"Boomify",MB_OK|MB_ICONERROR);return;}playing=true;SetTimer(win,1,33,nullptr);InvalidateRect(win,nullptr,FALSE);}
 void exportNav(){auto p=dialog(true,L"WAV Audio\0*.wav\0",L"wav");if(p.empty())return;std::vector<int16_t>a;renderNav(a,0);if(!a.empty()){size_t last=0;bool found=false;for(size_t i=a.size();i>0;--i)if(std::abs((int)a[i-1])>8){last=i;found=true;break;}if(found){size_t tail=(size_t)SR/20*2;a.resize(std::min(a.size(),last+tail));}else a.clear();}if(a.empty()){MessageBoxW(win,L"Rien a exporter.",L"Boomify",MB_OK|MB_ICONWARNING);return;}std::ofstream o(p,std::ios::binary);if(!o){MessageBoxW(win,L"Impossible de creer le WAV.",L"Boomify",MB_OK|MB_ICONERROR);return;}uint32_t ds=(uint32_t)(a.size()*sizeof(int16_t)),rs=36+ds,fs=16,rate=SR,br=SR*4;uint16_t pcm=1,ch=2,al=4,bits=16;o.write("RIFF",4);o.write((char*)&rs,4);o.write("WAVEfmt ",8);o.write((char*)&fs,4);o.write((char*)&pcm,2);o.write((char*)&ch,2);o.write((char*)&rate,4);o.write((char*)&br,4);o.write((char*)&al,2);o.write((char*)&bits,2);o.write("data",4);o.write((char*)&ds,4);o.write((char*)a.data(),ds);o.close();MessageBoxW(win,L"Export WAV termine.",L"Boomify",MB_OK|MB_ICONINFORMATION);}
 }
