@@ -1,9 +1,11 @@
 #include "../src/audio_core_v2.hpp"
 #include <algorithm>
-#include <cassert>
+#include <cstdlib>
 #include <cmath>
 #include <iostream>
 #include <vector>
+
+void check(bool condition) { if (!condition) std::abort(); }
 
 using boomify::audio::FloatGraph;
 using boomify::audio::Note;
@@ -22,16 +24,16 @@ int main() {
         chunked.process(fragmented.data() + pos * 2,
                         std::min<size_t>(64, frames - pos));
     for (size_t i = 0; i < continuous.size(); ++i) {
-        assert(std::isfinite(continuous[i]));
-        assert(continuous[i] == fragmented[i]); // block-size independence
-        assert(continuous[i] >= -1.0f && continuous[i] <= 1.0f);
+        check(std::isfinite(continuous[i]));
+        check(continuous[i] == fragmented[i]); // block-size independence
+        check(continuous[i] >= -1.0f && continuous[i] <= 1.0f);
     }
     for (size_t i = 0; i < first.frame * 2; ++i)
-        assert(continuous[i] == 0.0f); // exact scheduled start
-    assert(continuous[130 * 2] != 0.0f);
+        check(continuous[i] == 0.0f); // exact scheduled start
+    check(continuous[130 * 2] != 0.0f);
     for (size_t i = 660 * 2; i < continuous.size(); ++i)
-        assert(continuous[i] == 0.0f); // no stuck voices
-    assert(whole.position() == frames);
+        check(continuous[i] == 0.0f); // no stuck voices
+    check(whole.position() == frames);
 
     // Mute through gain does not require a new render plan.
     FloatGraph muted;
@@ -39,7 +41,7 @@ int main() {
     muted.setTrackGain(0, 0.0f);
     std::vector<float> zero(frames * 2, 1.0f);
     muted.process(zero.data(), frames);
-    for (float v : zero) assert(v == 0.0f);
+    for (float v : zero) check(v == 0.0f);
 
     // Identical output across loop boundaries at a fixed sample position.
     FloatGraph looping;
@@ -48,8 +50,8 @@ int main() {
     std::vector<float> loops(512 * 2);
     looping.process(loops.data(), 512);
     for (size_t i = 0; i < 256 * 2; ++i)
-        assert(loops[i] == loops[i + 256 * 2]);
-    assert(looping.position() == 256);
+        check(loops[i] == loops[i + 256 * 2]);
+    check(looping.position() == 256);
 
     // Invalid notes are discarded without invalid output.
     FloatGraph safe;
@@ -57,7 +59,7 @@ int main() {
                   Note{0, 64, NAN, 1.0f, 0}, Note{0, 64, 220.0f, 1.0f, 99}});
     std::vector<float> invalid(512, 1.0f);
     safe.process(invalid.data(), 256);
-    for (float v : invalid) assert(v == 0.0f);
+    for (float v : invalid) check(v == 0.0f);
 
     std::cout << "Boomify Audio V2 basic invariants OK\n";
     return 0;
