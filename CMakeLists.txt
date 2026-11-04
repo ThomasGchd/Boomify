@@ -40,6 +40,12 @@ if(BOOMIFY_ENABLE_VST3)
     target_compile_options(BoomifyVST3Host PRIVATE /utf-8)
   endif()
   target_link_libraries(BoomifyVST3Host PRIVATE sdk_hosting sdk_common pluginterfaces base)
+  add_custom_command(TARGET BoomifyVST3Host POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
+      "$<TARGET_FILE_DIR:BoomifyVST3Host>/THIRD_PARTY_NOTICES.md"
+    VERBATIM)
+
   # Keep both Boomify.exe and the host in build/Release for the automatic build.
   set_target_properties(BoomifyVST3Host PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 endif()
