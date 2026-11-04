@@ -61,6 +61,36 @@ int main() {
     safe.process(invalid.data(), 256);
     for (float v : invalid) check(v == 0.0f);
 
+    // Notes are audible while the song transport is stopped, without seek/play.
+    FloatGraph preview;
+    preview.prepare({});
+    check(preview.audition(0, 440.0f, 0.1f, 0.45f));
+    std::vector<float> auditioned(8192 * 2);
+    preview.process(auditioned.data(), 8192);
+    bool hasAudibleSound = false;
+    for (float sample : auditioned)
+        if (std::abs(sample) > 0.001f) hasAudibleSound = true;
+    check(hasAudibleSound);
+    for (size_t i = 6000 * 2; i < auditioned.size(); ++i)
+        check(auditioned[i] == 0.0f);
+
+    // Gain is live: editing it takes effect in the next block without resetting
+    // the transport or the currently playing note.
+    FloatGraph realtime;
+    realtime.prepare({Note{0, 6000, 440.0f, 0.7f, 0}});
+    std::vector<float> first(512 * 2), silenced(512 * 2), restored(512 * 2);
+    realtime.process(first.data(), 512);
+    check(std::any_of(first.begin(), first.end(), [](float x) { return std::abs(x) > 0.01f; }));
+    realtime.setTrackGain(0, 0.0f);
+    realtime.process(silenced.data(), 512);
+    check(std::all_of(silenced.begin(), silenced.end(), [](float x) { return x == 0.0f; }));
+    realtime.setTrackGain(0, 1.0f);
+    realtime.process(restored.data(), 512);
+    check(std::any_of(restored.begin(), restored.end(), [](float x) { return std::abs(x) > 0.01f; }));
+    check(realtime.position() == 1536);
+    check(!preview.audition(-1, 440.0f));
+    check(!preview.audition(0, NAN));
+
     std::cout << "Boomify Audio V2 basic invariants OK\n";
     return 0;
 }
