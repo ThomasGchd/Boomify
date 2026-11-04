@@ -9,10 +9,11 @@
 namespace {
 namespace boomfs=std::filesystem;
 std::vector<std::wstring> availableVST3Nav;
-RECT vst3PickNavR{},vst3ClearNavR{};
+RECT vst3PickNavR{},vst3ClearNavR{},vst3StatusNavR{};
 bool vst3CatalogLoadedNav=false;
 // Cache short VST3 previews to keep repeated piano-roll clicks responsive.
 std::vector<std::pair<std::wstring,std::vector<int16_t>>> vst3PreviewCacheNav;
+std::array<std::wstring,V6_MAX_TRACKS> vst3RenderErrorsNav{};
 std::array<int,V6_MAX_TRACKS> vst3RenderStatusNav{}; // 0=not tried, 1=rendered, -1=failed
 static std::wstring vst3ShortNameNav(const std::wstring& path){
  if(path.empty())return L"NATIVE INSTRUMENT";
@@ -109,15 +110,15 @@ static void chooseVST3OnTrackNav(HWND h,POINT p){
  if(cmd==IDM_SCAN){scanSystemVST3Nav();MessageBoxW(h,L"Recherche terminee. Rouvre le menu VST3 pour choisir un instrument.",L"Boomify VST3",MB_OK|MB_ICONINFORMATION);}
  else if(cmd==IDM_IMPORT_FILE||cmd==IDM_IMPORT_FOLDER){
   auto path=cmd==IDM_IMPORT_FILE?chooseVST3BundleNav(h):chooseVST3FolderNav(h);
-  if(!path.empty()){rememberVST3Nav(path);saveVST3CatalogNav();vst3ForLaneNav[laneSelected]=path;vst3RenderStatusNav[laneSelected]=0;}
+  if(!path.empty()){rememberVST3Nav(path);saveVST3CatalogNav();vst3ForLaneNav[laneSelected]=path;vst3RenderStatusNav[laneSelected]=0;vst3RenderErrorsNav[laneSelected].clear();}
   else if(cmd==IDM_IMPORT_FOLDER)MessageBoxW(h,L"Selectionne le dossier qui se termine par .vst3.",L"Boomify VST3",MB_OK|MB_ICONINFORMATION);
- }else if(cmd==IDM_NATIVE){vst3ForLaneNav[laneSelected].clear();vst3RenderStatusNav[laneSelected]=0;}
+ }else if(cmd==IDM_NATIVE){vst3ForLaneNav[laneSelected].clear();vst3RenderStatusNav[laneSelected]=0;vst3RenderErrorsNav[laneSelected].clear();}
  else if(cmd>=IDM_FIRST&&(size_t)(cmd-IDM_FIRST)<availableVST3Nav.size())
-  {vst3ForLaneNav[laneSelected]=availableVST3Nav[cmd-IDM_FIRST];vst3RenderStatusNav[laneSelected]=0;}
+  {vst3ForLaneNav[laneSelected]=availableVST3Nav[cmd-IDM_FIRST];vst3RenderStatusNav[laneSelected]=0;vst3RenderErrorsNav[laneSelected].clear();}
  InvalidateRect(h,nullptr,FALSE);
 }
 static void drawVST3PanelNav(HDC d){
- vst3PickNavR={};vst3ClearNavR={};
+ vst3PickNavR={};vst3ClearNavR={};vst3StatusNavR={};
  if(laneSelected<0||laneSelected>=(int)lanes.size()||lanes[laneSelected].type!=LaneType::Instrument)return;
  auto p=panels15.inspector;
  int left=(int)p.left+19,right=(int)p.right-20,top=(int)p.bottom-180;
@@ -131,7 +132,8 @@ static void drawVST3PanelNav(HDC d){
  vst3PickNavR={left,(LONG)(top+70),right,(LONG)(top+106)};
  pill16(d,vst3PickNavR,current.empty()?L"CHOISIR / IMPORTER VST3":L"CHANGER DE VST3",PURPLE16);
  if(!current.empty()){
-  const wchar_t* status=vst3RenderStatusNav[laneSelected]<0?L"RENDER VST3 EN ECHEC - SON NATIF UTILISE":vst3RenderStatusNav[laneSelected]>0?L"VST3 ACTIF":L"VST3 SELECTIONNE - PREMIER PLAY A VENIR";
+  const wchar_t* status=vst3RenderStatusNav[laneSelected]<0?L"VST3 EN ECHEC - CLIQUER POUR DETAILS":vst3RenderStatusNav[laneSelected]>0?L"VST3 ACTIF":L"PRET - CLIQUER SUR UNE NOTE";
+   vst3StatusNavR={left,(LONG)(top+54),right,(LONG)(top+71)};
   text16(d,status,{(LONG)left,(LONG)(top+55),(LONG)right,(LONG)(top+70)},7,vst3RenderStatusNav[laneSelected]<0?PINK16:RGB(166,171,191),FW_BOLD);
   vst3ClearNavR={left,(LONG)(top+112),right,(LONG)(top+143)};
   pill16(d,vst3ClearNavR,L"REVENIR AU SON NATIF",CYAN16);
@@ -141,8 +143,9 @@ static void drawVST3PanelNav(HDC d){
  }
 }
 static bool handleVST3PanelNav(HWND h,POINT p){
+ if(inside(vst3StatusNavR,p)){if(laneSelected>=0&&laneSelected<(int)lanes.size()&&vst3RenderStatusNav[laneSelected]<0){const auto&msg=vst3RenderErrorsNav[laneSelected];MessageBoxW(h,msg.empty()?L"Le VST3 ne produit pas de son. Verifiez son installation et reessayez.":msg.c_str(),L"Boomify - Diagnostic VST3",MB_OK|MB_ICONWARNING);}return true;}
  if(inside(vst3PickNavR,p)){chooseVST3OnTrackNav(h,p);return true;}
- if(inside(vst3ClearNavR,p)){if(laneSelected>=0&&laneSelected<(int)lanes.size()){vst3ForLaneNav[laneSelected].clear();vst3RenderStatusNav[laneSelected]=0;}InvalidateRect(h,nullptr,FALSE);return true;}
+ if(inside(vst3ClearNavR,p)){if(laneSelected>=0&&laneSelected<(int)lanes.size()){vst3ForLaneNav[laneSelected].clear();vst3RenderStatusNav[laneSelected]=0;vst3RenderErrorsNav[laneSelected].clear();}InvalidateRect(h,nullptr,FALSE);return true;}
  return false;
 }
 static boomfs::path vst3HostExeNav(){
@@ -165,6 +168,28 @@ static bool runVST3ChildNav(const std::wstring& plugin,const boomfs::path& notes
  DWORD code=1;GetExitCodeProcess(pi.hProcess,&code);
  CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
  return wait==WAIT_OBJECT_0&&code==0;
+}
+static void setVST3RenderFailureNav(int lane,const boomfs::path& output){
+ if(lane<0||lane>=V6_MAX_TRACKS)return;
+ vst3RenderStatusNav[lane]=-1;
+ auto path=boomfs::path(output.wstring()+L".error.txt");
+ std::ifstream err(path,std::ios::binary);
+ std::string msg;
+ if(err)std::getline(err,msg);
+ std::error_code ec;boomfs::remove(path,ec);
+ if(msg.size()>240)msg.resize(240);
+ if(msg.empty()){
+  if(!boomfs::is_regular_file(vst3HostExeNav(),ec))
+   msg="BoomifyVST3Host.exe est introuvable. Placez-le a cote de Boomify.exe.";
+  else msg="Le VST3 est inaccessible, incompatible ou a depasse le delai de rendu.";
+ }
+ vst3RenderErrorsNav[lane]=std::wstring(msg.begin(),msg.end())+
+     L"\n\nBoomify utilise le son natif pour cette piste.";
+ InvalidateRect(win,nullptr,FALSE);
+}
+static bool hasAudibleVST3SignalNav(const std::vector<int16_t>&samples){
+ for(int16_t value:samples)if(value>16||value< -16)return true;
+ return false;
 }
 // Render a single MIDI note for audition. This is a first-click offline preview:
 // subsequent clicks on the same plugin and pitch use the in-memory PCM cache.
@@ -199,8 +224,8 @@ static bool renderVST3PreviewNav(int lane,int row,std::vector<int16_t>&samples){
                loadWav15(audio.wstring(),raw);
   boomfs::remove(notes,ec);
   boomfs::remove(audio,ec);
-  if(!success||raw.empty()){
-   vst3RenderStatusNav[lane]=-1;
+  if(!success||raw.empty()||!hasAudibleVST3SignalNav(raw)){
+   setVST3RenderFailureNav(lane,audio);
    InvalidateRect(win,nullptr,FALSE);
    return false;
   }
@@ -212,7 +237,7 @@ static bool renderVST3PreviewNav(int lane,int row,std::vector<int16_t>&samples){
  samples.resize(raw.size());
  for(size_t i=0;i<raw.size();++i)
   samples[i]=(int16_t)std::clamp((int)std::lround(raw[i]*gain),-32768,32767);
- vst3RenderStatusNav[lane]=1;
+ vst3RenderStatusNav[lane]=1;vst3RenderErrorsNav[lane].clear();
  return true;
 }
 
@@ -252,9 +277,9 @@ static bool renderVST3LaneNav(int lane,int startBar,std::vector<int16_t>&mix){
  }
  events.close();
  std::error_code removeError;boomfs::remove(output,removeError);
- if(!runVST3ChildNav(vst3ForLaneNav[lane],input,output)){vst3RenderStatusNav[lane]=-1;return false;}
+ if(!runVST3ChildNav(vst3ForLaneNav[lane],input,output)){setVST3RenderFailureNav(lane,output);return false;}
  std::vector<int16_t> rendered;
- if(!loadWav15(output.wstring(),rendered)){vst3RenderStatusNav[lane]=-1;return false;}
+ if(!loadWav15(output.wstring(),rendered)||!hasAudibleVST3SignalNav(rendered)){setVST3RenderFailureNav(lane,output);return false;}
  const double gain=std::clamp(lanes[lane].volume,0,100)/100.0*std::clamp(master,0,100)/100.0;
  for(size_t k=0;k<mix.size()&&k<rendered.size();++k){
   int value=(int)mix[k]+(int)std::lround(rendered[k]*gain);
