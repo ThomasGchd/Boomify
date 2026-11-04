@@ -78,9 +78,9 @@ int main() {
     // the transport or the currently playing note.
     FloatGraph realtime;
     realtime.prepare({Note{0, 6000, 440.0f, 0.7f, 0}});
-    std::vector<float> first(512 * 2), silenced(512 * 2), restored(512 * 2);
-    realtime.process(first.data(), 512);
-    check(std::any_of(first.begin(), first.end(), [](float x) { return std::abs(x) > 0.01f; }));
+    std::vector<float> audibleBlock(512 * 2), silenced(512 * 2), restored(512 * 2);
+    realtime.process(audibleBlock.data(), 512);
+    check(std::any_of(audibleBlock.begin(), audibleBlock.end(), [](float x) { return std::abs(x) > 0.01f; }));
     realtime.setTrackGain(0, 0.0f);
     realtime.process(silenced.data(), 512);
     check(std::all_of(silenced.begin(), silenced.end(), [](float x) { return x == 0.0f; }));
