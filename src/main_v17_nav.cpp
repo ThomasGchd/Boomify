@@ -7,7 +7,7 @@ LRESULT CALLBACK proc_v17_nav(HWND,UINT,WPARAM,LPARAM);
 static ATOM RegisterClassW_nav(const WNDCLASSW* src){WNDCLASSW wc=*src;wc.lpfnWndProc=proc_v17_nav;return ::RegisterClassW(&wc);}
 #define RegisterClassW RegisterClassW_nav
 #define BOOMIFY_NAV_ENTRY_INCLUDE
-namespace { bool isUpdateHelperNav(); int runUpdateHelperNav(); void cleanupDownloadedUpdateNav(); void playPianoPreviewNav(int lane,int row); void drawFxSemantic17(HDC); void paintExtrasNav(HDC); }
+namespace { bool isUpdateHelperNav(); int runUpdateHelperNav(); void cleanupDownloadedUpdateNav(); void playPianoPreviewNav(int lane,int row); bool renderVST3PreviewNav(int lane,int row,std::vector<int16_t>&samples); void drawFxSemantic17(HDC); void paintExtrasNav(HDC); }
 #include "main_v17.cpp"
 #undef BOOMIFY_NAV_ENTRY_INCLUDE
 #undef RegisterClassW
