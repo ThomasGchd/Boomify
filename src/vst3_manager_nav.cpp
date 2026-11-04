@@ -15,6 +15,26 @@ bool vst3CatalogLoadedNav=false;
 std::vector<std::pair<std::wstring,std::vector<int16_t>>> vst3PreviewCacheNav;
 std::array<std::wstring,V6_MAX_TRACKS> vst3RenderErrorsNav{};
 std::array<int,V6_MAX_TRACKS> vst3RenderStatusNav{}; // 0=not tried, 1=rendered, -1=failed
+// Unlike Boomify's legacy ASCII-only project labels, plugin paths must
+// survive arbitrary Windows Unicode folder names.
+std::string vst3Utf8EncodeNav(const std::wstring& w){
+ if(w.empty())return {};
+ if(w.size()>32768)return {};
+ int needed=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,w.data(),(int)w.size(),nullptr,0,nullptr,nullptr);
+ if(needed<=0)return {};
+ std::string s((size_t)needed,'\0');
+ if(WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,w.data(),(int)w.size(),s.data(),needed,nullptr,nullptr)!=needed)return {};
+ return s;
+}
+std::wstring vst3Utf8DecodeNav(const std::string& s){
+ if(s.empty())return {};
+ if(s.size()>32768)return {};
+ int needed=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),(int)s.size(),nullptr,0);
+ if(needed<=0)return {};
+ std::wstring w((size_t)needed,L'\0');
+ if(MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s.data(),(int)s.size(),w.data(),needed)!=needed)return {};
+ return w;
+}
 static std::wstring vst3ShortNameNav(const std::wstring& path){
  if(path.empty())return L"NATIVE INSTRUMENT";
  auto name=boomfs::path(path).stem().wstring();
@@ -35,7 +55,7 @@ static void saveVST3CatalogNav(){
  auto p=vst3CatalogFileNav();std::error_code ec;boomfs::create_directories(p.parent_path(),ec);
  std::ofstream out(p,std::ios::binary|std::ios::trunc);
  if(!out)return;
- for(const auto&v:availableVST3Nav)out<<narrowName(v)<<"\n";
+ for(const auto&v:availableVST3Nav)out<<vst3Utf8EncodeNav(v)<<"\n";
 }
 static void initVST3CatalogNav(){
  if(vst3CatalogLoadedNav)return;
@@ -43,7 +63,7 @@ static void initVST3CatalogNav(){
  std::ifstream f(vst3CatalogFileNav(),std::ios::binary);
  std::string line;
  while(std::getline(f,line)){
-  auto val=widenName(line);std::error_code ec;
+  auto val=vst3Utf8DecodeNav(line);std::error_code ec;
   if(!val.empty()&&boomfs::exists(boomfs::path(val),ec))rememberVST3Nav(val);
  }
 }
