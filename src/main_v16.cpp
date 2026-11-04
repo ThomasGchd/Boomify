@@ -24,47 +24,47 @@ void showContextHelp16(HWND h){
   std::wstring title=L"Boomify - Comprendre et essayer";
   std::wstring msg;
   if(laneSelected<0||laneSelected>=(int)lanes.size()){
-    msg=L"Commence avec + TRACK pour ajouter un instrument, une batterie ou un sample.\\n"
-        L"Chaque piste contient ses propres mesures dans l'arrangement.\\n\\n"
+    msg=L"Commence avec + TRACK pour ajouter un instrument, une batterie ou un sample.\n"
+        L"Chaque piste contient ses propres mesures dans l'arrangement.\n\n"
         L"A ESSAYER : ajoute une piste, selectionne une mesure puis cree une note ou un hit.";
   }else if(lanes[laneSelected].type==LaneType::Audio){
-    msg=L"PISTE AUDIO / SAMPLE\\n\\n"
-        L"Le WAV est lu a la mesure choisie, puis passe dans les effets de cette piste.\\n"
-        L"Le volume de la piste regle son niveau, M coupe le son et S isole la piste.\\n"
-        L"Le fichier audio reste externe au projet .boom : ne le deplace pas apres import.\\n\\n"
+    msg=L"PISTE AUDIO / SAMPLE\n\n"
+        L"Le WAV est lu a la mesure choisie, puis passe dans les effets de cette piste.\n"
+        L"Le volume de la piste regle son niveau, M coupe le son et S isole la piste.\n"
+        L"Le fichier audio reste externe au projet .boom : ne le deplace pas apres import.\n\n"
         L"A ESSAYER : importe un WAV, ajoute un effet, puis compare avec et sans effet.";
   }else if(lanes[laneSelected].type==LaneType::Drums){
     if(kicks15[laneSelected].enabled){
-      msg=L"BOOMBOX / KICK DESIGNER\\n\\n"
-          L"PITCH : hauteur et descente de frequence au debut du kick.\\n"
-          L"DECAY : duree de la queue du kick.\\n"
-          L"PUNCH : impact de l'attaque.\\n"
-          L"DRIVE : saturation du corps.\\n"
-          L"La chaine FX agit ensuite sur cette piste, dans l'ordre des effets.\\n\\n"
+      msg=L"BOOMBOX / KICK DESIGNER\n\n"
+          L"PITCH : hauteur et descente de frequence au debut du kick.\n"
+          L"DECAY : duree de la queue du kick.\n"
+          L"PUNCH : impact de l'attaque.\n"
+          L"DRIVE : saturation du corps.\n"
+          L"La chaine FX agit ensuite sur cette piste, dans l'ordre des effets.\n\n"
           L"A ESSAYER : commence avec un decay court, augmente le drive, puis compare avec et sans distortion.";
     }else{
-      msg=L"BATTERIE / SEQUENCEUR 64 PAS\\n\\n"
-          L"Une mesure en 4/4 contient quatre temps. Ici chaque temps a 16 subdivisions.\\n"
-          L"Les traits plus marques indiquent les temps et les pas classiques.\\n"
-          L"Chaque mesure a son propre pattern : changer la mesure 2 ne change pas la mesure 1.\\n"
-          L"M coupe une piste et S permet de l'ecouter seule.\\n\\n"
+      msg=L"BATTERIE / SEQUENCEUR 64 PAS\n\n"
+          L"Une mesure en 4/4 contient quatre temps. Ici chaque temps a 16 subdivisions.\n"
+          L"Les traits plus marques indiquent les temps et les pas classiques.\n"
+          L"Chaque mesure a son propre pattern : changer la mesure 2 ne change pas la mesure 1.\n"
+          L"M coupe une piste et S permet de l'ecouter seule.\n\n"
           L"A ESSAYER : place un kick sur chaque temps et des hi-hats entre les temps.";
     }
   }else if(sound9[laneSelected]==Sound9::AcidBass){
-    msg=L"INSTRUMENT ACID 303\\n\\n"
-        L"Le son utilise une forme d'onde riche en harmoniques.\\n"
-        L"Une ligne acid commence souvent avec peu de notes et un rythme marque.\\n"
-        L"Le bouton ACID 303 choisit le timbre natif, mais ne fournit pas encore les commandes de resonance et de slide d'une vraie TB-303.\\n\\n"
+    msg=L"INSTRUMENT ACID 303\n\n"
+        L"Le son utilise une forme d'onde riche en harmoniques.\n"
+        L"Une ligne acid commence souvent avec peu de notes et un rythme marque.\n"
+        L"Le bouton ACID 303 choisit le timbre natif, mais ne fournit pas encore les commandes de resonance et de slide d'une vraie TB-303.\n\n"
         L"A ESSAYER : cree des notes courtes dans le Piano Roll, puis ajoute une distortion legere dans la chaine FX.";
   }else{
-    msg=L"INSTRUMENT / PIANO ROLL\\n\\n"
-        L"La position horizontale determine QUAND la note joue.\\n"
-        L"La hauteur verticale determine la note. Sa largeur regle sa duree.\\n"
-        L"Les traits plus marques correspondent aux temps de la mesure.\\n"
-        L"Chaque piste et chaque mesure possedent leurs propres notes.\\n\\n"
+    msg=L"INSTRUMENT / PIANO ROLL\n\n"
+        L"La position horizontale determine QUAND la note joue.\n"
+        L"La hauteur verticale determine la note. Sa largeur regle sa duree.\n"
+        L"Les traits plus marques correspondent aux temps de la mesure.\n"
+        L"Chaque piste et chaque mesure possedent leurs propres notes.\n\n"
         L"A ESSAYER : fais une note courte puis une longue, et ecoute la difference.";
   }
-  msg+=L"\\n\\nASTUCE : l'ordre des effets change le son. Essaie Distortion avant et apres un filtre.";
+  msg+=L"\n\nASTUCE : l'ordre des effets change le son. Essaie Distortion avant et apres un filtre.";
   MessageBoxW(h,msg.c_str(),title.c_str(),MB_OK|MB_ICONINFORMATION);
 }
 void sync16(HWND h){layout11(h);layoutPanels15(h);trackList10=panels15.tracks;timeline10=panels15.timeline;editorArea11.left=0;editorArea11.top=panels15.timeline.bottom;editorArea11.right=panels15.timeline.right;browser10=editorArea11;inspector10=panels15.inspector;inspector10.bottom=GetSystemMetrics(SM_CYSCREEN)*2;for(int i=0;i<V6_MAX_TRACKS;i++){laneHeadR[i]={0,0,0,0};laneMuteR[i]={0,0,0,0};soloR[i]={0,0,0,0};laneVolR[i]={0,0,0,0};volume16[i]={0,0,0,0};}for(int i=0;i<(int)lanes.size();++i)laneHeadR[i]=trackRow15(i);}
