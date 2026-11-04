@@ -1,0 +1,7 @@
+build/
+.boomify_dependencies/
+*.user
+*.suo
+*.vcxproj.user
+boomify_crash.log
+*.boom
