@@ -11,3 +11,11 @@ if(MSVC)
   target_compile_options(Boomify PRIVATE /utf-8)
 endif()
 target_link_libraries(Boomify PRIVATE winmm comdlg32 urlmon advapi32 shell32)
+
+# Audio V2 migration is isolated: compile and test the float32 graph independently
+# of the existing WinMM playback path until behavioral and audio regression tests pass.
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(BoomifyAudioCoreTests tests/audio_core_v2_tests.cpp)
+  add_test(NAME BoomifyAudioCoreInvariants COMMAND BoomifyAudioCoreTests)
+endif()
