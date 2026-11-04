@@ -46,6 +46,7 @@ jobs:
           path: |
             build/Release/Boomify.exe
             build/Release/BoomifyVST3Host.exe
+            build/Release/THIRD_PARTY_NOTICES.md
           if-no-files-found: error
           retention-days: 14
 
@@ -73,5 +74,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload Boomify executable" }
           gh release upload alpha-rolling "build/Release/BoomifyVST3Host.exe#BoomifyVST3Host.exe" --clobber --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload VST3 host executable" }
+          gh release upload alpha-rolling "build/Release/THIRD_PARTY_NOTICES.md#THIRD_PARTY_NOTICES.md" --clobber --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload third-party licenses" }
           gh release upload alpha-rolling "build/Release/version.txt#version.txt" --clobber --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload version manifest" }
