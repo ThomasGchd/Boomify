@@ -17,7 +17,7 @@ goto :ensure_git
 echo [Boomify] Installation des outils de compilation C++...
 where winget >nul 2>nul
 if errorlevel 1 goto :no_winget
-winget install --id Microsoft.VisualStudio.2022.BuildTools -e --source winget --accept-source-agreements --accept-package-agreements --override "--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --source winget --accept-source-agreements --accept-package-agreements --override "--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 if errorlevel 1 goto :install_error
 call :find_tools
 if not defined CMAKE_EXE goto :restart_needed
