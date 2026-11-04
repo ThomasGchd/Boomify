@@ -159,10 +159,10 @@ void checkAndUpdateBoomifyNav(HWND owner) {
             L"Boomify - Mise a jour", MB_OK | MB_ICONWARNING);
         return;
     }
-    std::string remoteSha, remoteHash;
+    std::string remoteSha, remoteHash, remoteHostHash;
     {
         std::ifstream in{std::filesystem::path(manifestPath)};
-        in >> remoteSha >> remoteHash;
+        in >> remoteSha >> remoteHash >> remoteHostHash;
     }
     DeleteFileW(manifestPath.c_str());
     if (!isHexNav(remoteSha, 40) || !isHexNav(remoteHash, 64)) {
@@ -171,6 +171,27 @@ void checkAndUpdateBoomifyNav(HWND owner) {
         return;
     }
     if (remoteSha == std::string(BOOMIFY_BUILD_SHA)) {
+        // Older updaters only installed Boomify.exe. Recover the optional VST3
+        // renderer on the next update check without replacing the main app.
+        if(isHexNav(remoteHostHash,64)){
+            std::filesystem::path helper=std::filesystem::path(target).parent_path()/L"BoomifyVST3Host.exe";
+            std::string localHostHash;
+            if(!fileSHA256Nav(helper.wstring(),localHostHash)||localHostHash!=remoteHostHash){
+                std::wstring stage=target+L".vst3host.download";
+                std::string got;
+                if(downloadUpdateNav(L"BoomifyVST3Host.exe",stage)&&
+                   fileSHA256Nav(stage,got)&&got==remoteHostHash&&
+                   MoveFileExW(stage.c_str(),helper.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)){
+                    MessageBoxW(owner,L"Moteur VST3 installe. Boomify est a jour.",
+                                L"Boomify - Mise a jour",MB_OK|MB_ICONINFORMATION);
+                    return;
+                }
+                DeleteFileW(stage.c_str());
+                MessageBoxW(owner,L"Boomify est a jour, mais le moteur VST3 n'a pas pu etre installe.",
+                             L"Boomify - Mise a jour",MB_OK|MB_ICONWARNING);
+                return;
+            }
+        }
         MessageBoxW(owner, L"Boomify est deja a jour.",
                     L"Boomify - Mise a jour", MB_OK | MB_ICONINFORMATION);
         return;
@@ -178,7 +199,7 @@ void checkAndUpdateBoomifyNav(HWND owner) {
     std::wstring question =
         L"Nouvelle build disponible : " + widenAsciiNav(remoteSha.substr(0, 8)) +
         L".\n\nEnregistrez votre projet .boom avant de continuer.\n"
-        L"Boomify va telecharger uniquement le nouvel executable, puis se fermer et redemarrer.\n"
+        L"Boomify va telecharger ses executables, puis se fermer et redemarrer.\n"
         L"Vos projets et samples ne seront pas effaces.\n\n"
         L"Installer la nouvelle version ?";
     if (MessageBoxW(owner, question.c_str(), L"Boomify - Mise a jour",
@@ -197,6 +218,25 @@ void checkAndUpdateBoomifyNav(HWND owner) {
                            L"Mise a jour annulee sans modifier Boomify.",
                     L"Boomify - Mise a jour", MB_OK | MB_ICONERROR);
         return;
+    }
+    // The third manifest hash authenticates the companion VST3 renderer.
+    if (isHexNav(remoteHostHash, 64)) {
+        std::filesystem::path hostPath=std::filesystem::path(target).parent_path()/L"BoomifyVST3Host.exe";
+        std::wstring stagedHost=target+L".vst3host.download";
+        if (!downloadUpdateNav(L"BoomifyVST3Host.exe", stagedHost)) {
+            DeleteFileW(staged.c_str());
+            MessageBoxW(owner,L"Impossible de telecharger le moteur VST3. Mise a jour annulee.",
+                         L"Boomify - Mise a jour",MB_OK|MB_ICONERROR);
+            return;
+        }
+        std::string actualHostHash;
+        if (!fileSHA256Nav(stagedHost,actualHostHash)||actualHostHash!=remoteHostHash||
+            !MoveFileExW(stagedHost.c_str(),hostPath.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {
+            DeleteFileW(stagedHost.c_str());DeleteFileW(staged.c_str());
+            MessageBoxW(owner,L"Le moteur VST3 n'a pas pu etre verifie ou installe. Mise a jour annulee.",
+                         L"Boomify - Mise a jour",MB_OK|MB_ICONERROR);
+            return;
+        }
     }
     std::wstring command = L"\"" + staged + L"\" --boomify-apply \"" + target +
                            L"\" " + std::to_wstring(GetCurrentProcessId());

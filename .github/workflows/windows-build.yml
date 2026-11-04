@@ -34,13 +34,19 @@ jobs:
           if (-not (Test-Path 'build/Release/Boomify.exe')) {
             throw 'Boomify.exe was not generated.'
           }
-          Get-Item 'build/Release/Boomify.exe' | Select-Object Name, Length
+          if (-not (Test-Path 'build/Release/BoomifyVST3Host.exe')) {
+            throw 'VST3 host executable was not generated.'
+          }
+          Get-Item 'build/Release/Boomify*.exe' | Select-Object Name, Length
 
       - name: Upload compiled application
         uses: actions/upload-artifact@v4
         with:
           name: Boomify-Windows-x64
-          path: build/Release/Boomify.exe
+          path: |
+            build/Release/Boomify.exe
+            build/Release/BoomifyVST3Host.exe
+            build/Release/THIRD_PARTY_NOTICES.md
           if-no-files-found: error
           retention-days: 14
 
@@ -50,7 +56,8 @@ jobs:
         run: |
           $sha = "${{ github.sha }}"
           $digest = (Get-FileHash "build/Release/Boomify.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          @($sha, $digest) | Set-Content -Path "build/Release/version.txt" -Encoding ascii
+          $hostDigest = (Get-FileHash "build/Release/BoomifyVST3Host.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          @($sha, $digest, $hostDigest) | Set-Content -Path "build/Release/version.txt" -Encoding ascii
 
       - name: Publish rolling alpha update
         if: github.event_name != 'pull_request'
@@ -65,5 +72,9 @@ jobs:
           }
           gh release upload alpha-rolling "build/Release/Boomify.exe#Boomify.exe" --clobber --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload Boomify executable" }
+          gh release upload alpha-rolling "build/Release/BoomifyVST3Host.exe#BoomifyVST3Host.exe" --clobber --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload VST3 host executable" }
+          gh release upload alpha-rolling "build/Release/THIRD_PARTY_NOTICES.md#THIRD_PARTY_NOTICES.md" --clobber --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload third-party licenses" }
           gh release upload alpha-rolling "build/Release/version.txt#version.txt" --clobber --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload version manifest" }
