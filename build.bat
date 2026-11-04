@@ -9,17 +9,22 @@ echo ========================================
 echo.
 
 call :find_tools
-if defined CMAKE_EXE if defined VS_GENERATOR goto :build
+if defined CMAKE_EXE if defined VS_GENERATOR goto :ensure_git
 
 echo [Boomify] Outils de compilation manquants.
 where winget >nul 2>nul
-if errorlevel 1 goto :no_winget
+if errorlevel 1 goto :no_git
+echo [ERREUR] Git est manquant. Installez Git for Windows puis relancez build.bat.
+pause
+exit /b 1
+
+:no_winget
 winget install --id Microsoft.VisualStudio.2022.BuildTools -e --source winget --accept-source-agreements --accept-package-agreements --override "--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 if errorlevel 1 goto :install_error
 call :find_tools
 if not defined CMAKE_EXE goto :restart_needed
 if not defined VS_GENERATOR goto :restart_needed
-goto :build
+goto :ensure_git
 
 :find_tools
 set "CMAKE_EXE="
@@ -36,6 +41,16 @@ if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
 if defined VS_VERSION echo %VS_VERSION% | findstr /b "17\." >nul && set "VS_GENERATOR=Visual Studio 17 2022"
 exit /b 0
 
+:ensure_git
+where git.exe >nul 2>nul
+if not errorlevel 1 goto :build
+echo [Boomify] Git est requis pour recuperer le SDK VST3 open source.
+where winget >nul 2>nul
+if errorlevel 1 goto :no_git
+winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements
+if errorlevel 1 goto :no_git
+goto :restart_needed
+
 :build
 echo [Boomify] Nettoyage complet de l'ancienne build...
 if exist build rmdir /s /q build
@@ -50,7 +65,13 @@ echo [Boomify] Compilation Release...
 "%CMAKE_EXE%" --build build --config Release
 if errorlevel 1 goto :build_error
 
-if not exist "%~dp0build\Release\Boomify.exe" goto :exe_missing
+if not exist "%~dp0build\Release\Boomify.exe" goto :host_missing
+echo [ERREUR] BoomifyVST3Host.exe n'a pas ete genere.
+pause
+exit /b 1
+
+:exe_missing
+if not exist "%~dp0build\Release\BoomifyVST3Host.exe" goto :host_missing
 
 echo.
 echo ========================================
