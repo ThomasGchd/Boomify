@@ -44,6 +44,28 @@ public:
         seek(0);
     }
 
+    // Audition one note without starting or seeking the song transport.
+    // Single-producer (UI) to single-consumer (audio callback) lock-free queue.
+    // Returns false rather than blocking when the queue is full.
+    bool audition(int track, float frequency, float seconds = 0.24f,
+                  float velocity = 0.45f) noexcept {
+        if (track < 0 || track >= kMaxTracks || !(frequency > 0.0f) ||
+            !std::isfinite(frequency) || !(seconds > 0.0f) ||
+            !std::isfinite(seconds) || !std::isfinite(velocity)) return false;
+        const auto write = previewWrite_.load(std::memory_order_relaxed);
+        const auto read = previewRead_.load(std::memory_order_acquire);
+        if (write - read >= kPreviewQueueCapacity) return false;
+        Note note{};
+        note.track = track;
+        note.frequency = std::min(frequency, sampleRate_ * 0.45f);
+        note.velocity = std::clamp(velocity, 0.0f, 1.0f);
+        note.length = std::max<std::uint64_t>(1, (std::uint64_t)(
+            std::min(seconds, 5.0f) * sampleRate_));
+        previews_[write % kPreviewQueueCapacity] = note;
+        previewWrite_.store(write + 1, std::memory_order_release);
+        return true;
+    }
+
     void setTrackGain(int track, float gain) noexcept {
         if (track >= 0 && track < kMaxTracks && std::isfinite(gain))
             gains_[(size_t)track].store(std::clamp(gain, 0.0f, 2.0f),
@@ -70,7 +92,14 @@ public:
 
     // Interleaved stereo float32; no new/delete, locks, system calls or I/O here.
     void process(float* output, size_t frames) noexcept {
-        if (!output) return;
+        if (!output || frames == 0) return;
+        const auto write = previewWrite_.load(std::memory_order_acquire);
+        auto read = previewRead_.load(std::memory_order_relaxed);
+        while (read != write) {
+            startVoice(previews_[read % kPreviewQueueCapacity]);
+            ++read;
+        }
+        previewRead_.store(read, std::memory_order_release);
         for (size_t i = 0; i < frames; ++i) {
             if (loopEnd_ && frame_ >= loopEnd_) seek(loopBegin_);
             while (nextNote_ < notes_.size() && notes_[nextNote_].frame <= frame_) {
@@ -125,6 +154,9 @@ private:
         // A voice cap is deliberate: overload must not allocate in the callback.
     }
 
+    static constexpr std::uint32_t kPreviewQueueCapacity = 32;
+    std::array<Note, kPreviewQueueCapacity> previews_{};
+    std::atomic<std::uint32_t> previewWrite_{0}, previewRead_{0};
     unsigned sampleRate_;
     std::uint64_t frame_ = 0, loopBegin_ = 0, loopEnd_ = 0;
     size_t nextNote_ = 0;
