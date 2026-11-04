@@ -171,6 +171,27 @@ void checkAndUpdateBoomifyNav(HWND owner) {
         return;
     }
     if (remoteSha == std::string(BOOMIFY_BUILD_SHA)) {
+        // Older updaters only installed Boomify.exe. Recover the optional VST3
+        // renderer on the next update check without replacing the main app.
+        if(isHexNav(remoteHostHash,64)){
+            std::filesystem::path helper=std::filesystem::path(target).parent_path()/L"BoomifyVST3Host.exe";
+            std::string localHostHash;
+            if(!fileSHA256Nav(helper.wstring(),localHostHash)||localHostHash!=remoteHostHash){
+                std::wstring stage=target+L".vst3host.download";
+                std::string got;
+                if(downloadUpdateNav(L"BoomifyVST3Host.exe",stage)&&
+                   fileSHA256Nav(stage,got)&&got==remoteHostHash&&
+                   MoveFileExW(stage.c_str(),helper.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)){
+                    MessageBoxW(owner,L"Moteur VST3 installe. Boomify est a jour.",
+                                L"Boomify - Mise a jour",MB_OK|MB_ICONINFORMATION);
+                    return;
+                }
+                DeleteFileW(stage.c_str());
+                MessageBoxW(owner,L"Boomify est a jour, mais le moteur VST3 n'a pas pu etre installe.",
+                             L"Boomify - Mise a jour",MB_OK|MB_ICONWARNING);
+                return;
+            }
+        }
         MessageBoxW(owner, L"Boomify est deja a jour.",
                     L"Boomify - Mise a jour", MB_OK | MB_ICONINFORMATION);
         return;
