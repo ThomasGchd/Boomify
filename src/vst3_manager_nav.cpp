@@ -259,23 +259,25 @@ static bool renderVST3LaneNav(int lane,int startBar,std::vector<int16_t>&mix){
  if(!events)return false;
  events<<SR<<" "<<bpm<<" "<<frames<<"\n";
  int midiBase=familyOf(sound9[lane])==Family9::Bass?47:71;
+ bool hasNotes=false;
  for(int b=std::max(0,startBar);b<activeBars;++b){
   int64_t offset=(b-startBar)*barFrames;
   if(!fine16[lane][b].empty()){
    for(const auto&n:fine16[lane][b]){
     int64_t at=offset+n.start*tickFrames,dur=std::max<int64_t>(1,n.dur*tickFrames);
-    if(at>=0&&at<frames)events<<midiBase-n.row<<" "<<at<<" "<<at+dur<<" 0.85\n";
+    if(at>=0&&at<frames){hasNotes=true;events<<midiBase-n.row<<" "<<at<<" "<<at+dur<<" 0.85\n";}
    }
   }else{
    auto&notes=noteForLane(lane,b);
    for(int r=0;r<NOTES;++r)for(int step=0;step<STEPS;++step)if(notes[r][step]){
     int64_t at=offset+step*barFrames/STEPS;
     int64_t dur=std::max<int64_t>(1,barFrames/STEPS);
-    if(at>=0&&at<frames)events<<midiBase-r<<" "<<at<<" "<<at+dur<<" 0.85\n";
+    if(at>=0&&at<frames){hasNotes=true;events<<midiBase-r<<" "<<at<<" "<<at+dur<<" 0.85\n";}
    }
   }
  }
  events.close();
+ if(!hasNotes)return true; // Nothing for this VST to play: avoid launching a slow plugin.
  std::error_code removeError;boomfs::remove(output,removeError);
  if(!runVST3ChildNav(vst3ForLaneNav[lane],input,output)){setVST3RenderFailureNav(lane,output);return false;}
  std::vector<int16_t> rendered;
