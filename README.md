@@ -25,9 +25,9 @@ Select an instrument track (e.g. Bass or Synth). Click an empty cell to add a no
 4. Open the menu again to choose the installed instrument. Press Play to render its MIDI notes through the isolated VST3 host. WAV export uses the same external instrument rendering.
 5. Use **REVENIR AU SON NATIF** to restore the built-in instrument.
 
-Plugin paths are stored in an optional trailer of the existing `.boom` project format. Previously saved projects still open. If a plugin is unavailable or fails to render, Boomify falls back to the native instrument and marks the render as failed in the inspector.
+Plugin paths are stored as UTF-8 in an optional trailer of the existing `.boom` project format, including accented Windows folder names. Previously saved projects still open. If a plugin is unavailable or fails to render, Boomify falls back to the native instrument and marks the render as failed in the inspector.
 
-**Current alpha limitations:** VST3 **instruments** with 32-bit floating-point audio processing and MIDI note input are supported in offline rendering. This is not yet a low-latency live host. At present, piano-roll note audition always uses the native sound, even on VST3 tracks; VST3 plugin editors, saved plugin parameters/presets and external VST3 audio effects are not yet implemented. VST2, AU and AAX are not supported. No third-party VST3 plugin is bundled.
+**Current alpha limitations:** VST3 **instruments** with 32-bit floating-point audio processing and MIDI note input are supported in offline rendering. This is not yet a low-latency live host. Piano-roll note audition uses the assigned VST3 instrument when available: its first pitch preview is rendered by the external host (which may take a few seconds), and repeated pitches are served from an in-memory cache. If the plugin fails or produces silence, Boomify falls back to its native sound and displays a clickable diagnostic in the inspector. VST3 plugin editors, saved plugin parameters/presets and external VST3 audio effects are not yet implemented. VST2, AU and AAX are not supported. No third-party VST3 plugin is bundled.
 
 Loading third-party plugins runs third-party code with your user privileges. Boomify runs them in a separate helper process to limit the impact of a plugin crash, but this is not a security sandbox. Only use plugins from sources you trust.
 
