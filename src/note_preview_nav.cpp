@@ -40,10 +40,10 @@ void playPianoPreviewNav(int lane, int row) {
     const double frequency = hz(base - row);
     if (!(frequency > 0.0) || !std::isfinite(frequency)) return;
 
-    const size_t frames = (size_t)(SR * 0.24);
+    const size_t frames = (size_t)(SR * 0.36);
     notePreviewSamplesNav.assign(frames * 2, 0);
     double phase = 0.0;
-    const double level = 0.22 * (lanes[lane].volume / 100.0) *
+    const double level = 0.44 * (lanes[lane].volume / 100.0) *
                          (std::clamp(master, 0, 100) / 100.0);
     for (size_t f = 0; f < frames; ++f) {
         const double t = (double)f / SR;
@@ -72,6 +72,7 @@ void playPianoPreviewNav(int lane, int row) {
                     CALLBACK_NULL) != MMSYSERR_NOERROR) {
         notePreviewWaveNav = nullptr;
         notePreviewSamplesNav.clear();
+        MessageBoxW(win,L"Impossible d'ouvrir la sortie audio pour la preecoute des notes.",L"Boomify - Piano roll",MB_OK|MB_ICONERROR);
         return;
     }
     notePreviewHeaderNav = {};
