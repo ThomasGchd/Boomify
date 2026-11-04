@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <vector>
+#include <string>
 #include <cmath>
 LRESULT CALLBACK proc_v17_nav(HWND,UINT,WPARAM,LPARAM);
 static ATOM RegisterClassW_nav(const WNDCLASSW* src){WNDCLASSW wc=*src;wc.lpfnWndProc=proc_v17_nav;return ::RegisterClassW(&wc);}
