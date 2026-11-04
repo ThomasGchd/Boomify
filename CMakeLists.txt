@@ -29,7 +29,12 @@ if(BOOMIFY_ENABLE_VST3)
     GIT_PROGRESS TRUE
     GIT_SUBMODULES_RECURSE TRUE)
   FetchContent_MakeAvailable(vst3sdk)
-  add_executable(BoomifyVST3Host src/vst3_host.cpp)
+  add_executable(BoomifyVST3Host
+    src/vst3_host.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module_win32.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/plugprovider.cpp
+  )
   target_compile_definitions(BoomifyVST3Host PRIVATE UNICODE _UNICODE NOMINMAX)
   if(MSVC)
     target_compile_options(BoomifyVST3Host PRIVATE /utf-8)
