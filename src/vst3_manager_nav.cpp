@@ -11,6 +11,8 @@ namespace boomfs=std::filesystem;
 std::vector<std::wstring> availableVST3Nav;
 RECT vst3PickNavR{},vst3ClearNavR{};
 bool vst3CatalogLoadedNav=false;
+// Cache short VST3 previews to keep repeated piano-roll clicks responsive.
+std::vector<std::pair<std::wstring,std::vector<int16_t>>> vst3PreviewCacheNav;
 std::array<int,V6_MAX_TRACKS> vst3RenderStatusNav{}; // 0=not tried, 1=rendered, -1=failed
 static std::wstring vst3ShortNameNav(const std::wstring& path){
  if(path.empty())return L"NATIVE INSTRUMENT";
@@ -140,7 +142,7 @@ static void drawVST3PanelNav(HDC d){
 }
 static bool handleVST3PanelNav(HWND h,POINT p){
  if(inside(vst3PickNavR,p)){chooseVST3OnTrackNav(h,p);return true;}
- if(inside(vst3ClearNavR,p)){if(laneSelected>=0&&laneSelected<(int)lanes.size())vst3ForLaneNav[laneSelected].clear();InvalidateRect(h,nullptr,FALSE);return true;}
+ if(inside(vst3ClearNavR,p)){if(laneSelected>=0&&laneSelected<(int)lanes.size()){vst3ForLaneNav[laneSelected].clear();vst3RenderStatusNav[laneSelected]=0;}InvalidateRect(h,nullptr,FALSE);return true;}
  return false;
 }
 static boomfs::path vst3HostExeNav(){
@@ -148,7 +150,7 @@ static boomfs::path vst3HostExeNav(){
  if(!len||len>=MAX_PATH)return {};
  return boomfs::path(b).parent_path()/L"BoomifyVST3Host.exe";
 }
-static bool runVST3ChildNav(const std::wstring& plugin,const boomfs::path& notes,const boomfs::path& output){
+static bool runVST3ChildNav(const std::wstring& plugin,const boomfs::path& notes,const boomfs::path& output,DWORD timeoutMs=30000){
  auto host=vst3HostExeNav();std::error_code ec;
  if(!boomfs::is_regular_file(host,ec))return false;
  std::wstring args=L"\""+host.wstring()+L"\" \""+plugin+L"\" \""+
@@ -158,12 +160,62 @@ static bool runVST3ChildNav(const std::wstring& plugin,const boomfs::path& notes
  PROCESS_INFORMATION pi{};
  if(!CreateProcessW(host.c_str(),cmd.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,
                       nullptr,host.parent_path().c_str(),&si,&pi))return false;
- DWORD wait=WaitForSingleObject(pi.hProcess,30000);
+ DWORD wait=WaitForSingleObject(pi.hProcess,timeoutMs);
  if(wait==WAIT_TIMEOUT){TerminateProcess(pi.hProcess,1);WaitForSingleObject(pi.hProcess,1000);}
  DWORD code=1;GetExitCodeProcess(pi.hProcess,&code);
  CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
  return wait==WAIT_OBJECT_0&&code==0;
 }
+// Render a single MIDI note for audition. This is a first-click offline preview:
+// subsequent clicks on the same plugin and pitch use the in-memory PCM cache.
+static bool renderVST3PreviewNav(int lane,int row,std::vector<int16_t>&samples){
+ if(lane<0||lane>=(int)lanes.size()||row<0||row>=NOTES||
+    vst3ForLaneNav[lane].empty()||vst3RenderStatusNav[lane]<0)return false;
+ int midiBase=familyOf(sound9[lane])==Family9::Bass?47:71;
+ int pitch=midiBase-row;
+ if(pitch<0||pitch>127)return false;
+ const std::wstring key=vst3ForLaneNav[lane]+L"|"+std::to_wstring(pitch);
+ std::vector<int16_t> raw;
+ for(const auto&c:vst3PreviewCacheNav)if(c.first==key){raw=c.second;break;}
+ if(raw.empty()){
+  std::error_code ec;
+  boomfs::path dir=boomfs::temp_directory_path(ec)/L"BoomifyVST3";
+  if(ec)return false;
+  boomfs::create_directories(dir,ec);
+  if(ec)return false;
+  std::wstring id=std::to_wstring(GetCurrentProcessId())+L"_preview_"+
+                   std::to_wstring(lane)+L"_"+std::to_wstring(pitch);
+  auto notes=dir/(L"notes_"+id+L".txt");
+  auto audio=dir/(L"render_"+id+L".wav");
+  {
+   std::ofstream out(notes,std::ios::trunc);
+   if(!out)return false;
+   out<<SR<<" "<<bpm<<" "<<(SR*8/10)<<"\n";
+   out<<pitch<<" 0 "<<(SR*3/10)<<" 0.9\n";
+   if(!out)return false;
+  }
+  boomfs::remove(audio,ec);
+  bool success=runVST3ChildNav(vst3ForLaneNav[lane],notes,audio,6500) &&
+               loadWav15(audio.wstring(),raw);
+  boomfs::remove(notes,ec);
+  boomfs::remove(audio,ec);
+  if(!success||raw.empty()){
+   vst3RenderStatusNav[lane]=-1;
+   InvalidateRect(win,nullptr,FALSE);
+   return false;
+  }
+  vst3PreviewCacheNav.push_back({key,raw});
+  if(vst3PreviewCacheNav.size()>24)vst3PreviewCacheNav.erase(vst3PreviewCacheNav.begin());
+ }
+ const double gain=std::clamp(lanes[lane].volume,0,100)/100.0*
+                   std::clamp(master,0,100)/100.0;
+ samples.resize(raw.size());
+ for(size_t i=0;i<raw.size();++i)
+  samples[i]=(int16_t)std::clamp((int)std::lround(raw[i]*gain),-32768,32767);
+ vst3RenderStatusNav[lane]=1;
+ return true;
+}
+
 static bool renderVST3LaneNav(int lane,int startBar,std::vector<int16_t>&mix){
  if(lane<0||lane>=(int)lanes.size()||vst3ForLaneNav[lane].empty())return false;
  if(lanes[lane].mute)return true;
