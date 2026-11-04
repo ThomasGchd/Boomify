@@ -65,9 +65,9 @@ static int execute(const fs::path& modulePath,const fs::path& notesPath,const fs
  auto factory=module->getFactory();
  auto classes=factory.classInfos();
  auto it=std::find_if(classes.begin(),classes.end(),[](const VST3::Hosting::ClassInfo& info){
-  return info.category()==kVstAudioEffectClass;
+  const auto&sub=info.subCategories();return info.category()==kVstAudioEffectClass&&std::find(sub.begin(),sub.end(),"Instrument")!=sub.end();
  });
- if(it==classes.end())throw std::runtime_error("No VST3 audio processor in bundle");
+ if(it==classes.end())throw std::runtime_error("No VST3 instrument in bundle (audio FX are not yet supported)");
  auto host=owned(new HostApplication());
  PluginContextFactory::instance().setPluginContext(host.get());
  auto provider=std::make_unique<PlugProvider>(factory,*it,true);
@@ -75,6 +75,7 @@ static int execute(const fs::path& modulePath,const fs::path& notesPath,const fs
  auto component=provider->getComponentPtr();
  FUnknownPtr<IAudioProcessor> processor(component);
  if(!processor)throw std::runtime_error("VST3 has no audio processor");
+ if(component->getBusCount(kEvent,kInput)<1)throw std::runtime_error("This VST3 has no note input");
  if(processor->canProcessSampleSize(kSample32)!=kResultTrue)
   throw std::runtime_error("VST3 does not support 32-bit float samples");
  for(int d=0;d<2;++d)for(int media=0;media<2;++media){
@@ -110,6 +111,7 @@ static int execute(const fs::path& modulePath,const fs::path& notesPath,const fs
    else{event.noteOff.channel=0;event.noteOff.pitch=(int16)e.pitch;event.noteOff.velocity=0;event.noteOff.noteId=-1;}
    events.addEvent(event);
   }
+  for(int bus=0;bus<pd.numOutputs;++bus)for(int c=0;c<pd.outputs[bus].numChannels;++c){auto ptr=pd.outputs[bus].channelBuffers32[c];if(ptr)std::fill(ptr,ptr+num,0.0f);}
   if(processor->process(pd)!=kResultOk){bad=true;break;}
   for(int i=0;i<num;++i){
    for(int channel=0;channel<2;++channel){
